@@ -12,6 +12,7 @@ import {
   Flex,
   Heading,
   Link,
+  Select,
   Text,
   Tooltip,
 } from "@radix-ui/themes";
@@ -531,26 +532,22 @@ export const UpdateCheckDialog: React.FC<UpdateCheckDialogProps> = ({
             >
               Target version:
             </Text>
-            <select
+            <Select.Root
+              size="3"
               value={selectedTag}
-              onChange={(event) => setSelectedTag(event.target.value)}
+              onValueChange={(value) => setSelectedTag(value)}
               disabled={isLoadingTargetDetails || isUpdating}
-              style={{
-                width: "100%",
-                border: "1px solid var(--gray-7)",
-                borderRadius: "var(--radius-2)",
-                padding: "8px",
-                background: "var(--color-panel-solid)",
-                color: "var(--gray-12)",
-              }}
             >
-              {availableTags.map((tag) => (
-                <option key={tag} value={tag}>
-                  {tag}
-                  {tag === currentTag ? " (current)" : ""}
-                </option>
-              ))}
-            </select>
+              <Select.Trigger className="!w-full" />
+              <Select.Content>
+                {availableTags.map((tag) => (
+                  <Select.Item key={tag} value={tag}>
+                    {tag}
+                    {tag === currentTag ? " (current)" : ""}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
             {!hasRollbackOptions && (
               <Text
                 size="1"
