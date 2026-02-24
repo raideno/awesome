@@ -13,6 +13,7 @@ import {
   Heading,
   Link,
   Text,
+  Tooltip,
 } from "@radix-ui/themes";
 import React, { useEffect, useMemo, useState } from "react";
 
@@ -61,14 +62,16 @@ const ReleaseLinkRow: React.FC<ReleaseLinkRowProps> = ({ label, tag }) => {
       <Text size="2" weight="medium">
         {label}:{" "}
       </Text>
-      <Link
-        href={`https://github.com/${AWESOME_ACTION_OWNER}/${AWESOME_ACTION_REPO}/releases/tag/${tag}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex gap-1 items-center"
-      >
-        {tag} <ExternalLinkIcon />
-      </Link>
+      <Tooltip content="Changelog">
+        <Link
+          href={`https://github.com/${AWESOME_ACTION_OWNER}/${AWESOME_ACTION_REPO}/releases/tag/${tag}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex gap-1 items-center"
+        >
+          {tag} <ExternalLinkIcon />
+        </Link>
+      </Tooltip>
     </Box>
   );
 };
@@ -586,6 +589,7 @@ export const UpdateCheckDialog: React.FC<UpdateCheckDialogProps> = ({
                   </Callout.Text>
                 </Callout.Root>
               )}
+
               <ReleaseLinkRow label="Current version" tag={currentTag} />
 
               <ReleaseLinkRow label="Target version" tag={selectedTag} />
