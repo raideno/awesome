@@ -98,4 +98,4 @@ Copy the [`.env.example`](./.env.example) file to `.env` and fill in the require
 - Build: `npm run build`
 - Start Build: `npm run start`
 
-Do your changes in a separate branch and create a pull request to merge them into the `main` branch or `develop` branch if you are working on a feature.
+Do your changes in a separate branch and create a pull request to merge them into the `main` branch or `develop` branch if you are working on a feature. In order to push a new version of the action / website, simply push a new tag with the version number (e.g., `v0.2.1`) and the GitHub Action will automatically build and publish the new version to the GitHub Marketplace.
