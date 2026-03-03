@@ -1,0 +1,56 @@
+name: build website
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    steps:
+      - name: checkout repository
+        uses: actions/checkout@v4
+
+      - name: setup node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: install dependencies
+        run: npm ci
+
+      - name: get user repository commit hash
+        id: user-commit
+        run: |
+          echo "hash=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: get awesome tag
+        id: awesome-tag
+        run: |
+          TAG="${{ github.action_ref }}"
+          if [ -z "$TAG" ]; then
+            TAG=$(git describe --tags --exact-match 2>/dev/null || true)
+          fi
+          if [ -z "$TAG" ]; then
+            TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          fi
+          if [ -z "$TAG" ]; then
+            TAG=$(git rev-parse --short HEAD)
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+        shell: bash
+
+      - name: build
+        env:
+          BASE_PATH: /
+          LIST_FILE_PATH: ./example.list.yaml
+          GITHUB_REPOSITORY_URL: https://github.com/raideno/awesome
+          USER_REPOSITORY_COMMIT_HASH: ${{ steps.user-commit.outputs.hash }}
+          AWESOME_WEBSITE_TAG: ${{ steps.awesome-tag.outputs.tag }}
+          GITHUB_WORKFLOW_REF: ${{ github.workflow_ref }}
+        run: npm run build

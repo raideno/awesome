@@ -21,8 +21,7 @@
     ],
     "scripts": {
         "build": "tsc -p tsconfig.build.json",
-        "build:watch": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
-        "build::watch": "npm run build:watch",
+        "build::watch": "tsc -p tsconfig.build.json --watch --preserveWatchOutput",
         "prepublishOnly": "npm run build"
     },
     "dependencies": {

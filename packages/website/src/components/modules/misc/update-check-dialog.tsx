@@ -12,7 +12,9 @@ import {
   Flex,
   Heading,
   Link,
+  Select,
   Text,
+  Tooltip,
 } from "@radix-ui/themes";
 import React, { useEffect, useMemo, useState } from "react";
 
@@ -61,14 +63,16 @@ const ReleaseLinkRow: React.FC<ReleaseLinkRowProps> = ({ label, tag }) => {
       <Text size="2" weight="medium">
         {label}:{" "}
       </Text>
-      <Link
-        href={`https://github.com/${AWESOME_ACTION_OWNER}/${AWESOME_ACTION_REPO}/releases/tag/${tag}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex gap-1 items-center"
-      >
-        {tag} <ExternalLinkIcon />
-      </Link>
+      <Tooltip content="Changelog">
+        <Link
+          href={`https://github.com/${AWESOME_ACTION_OWNER}/${AWESOME_ACTION_REPO}/releases/tag/${tag}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex gap-1 items-center"
+        >
+          {tag} <ExternalLinkIcon />
+        </Link>
+      </Tooltip>
     </Box>
   );
 };
@@ -528,26 +532,22 @@ export const UpdateCheckDialog: React.FC<UpdateCheckDialogProps> = ({
             >
               Target version:
             </Text>
-            <select
+            <Select.Root
+              size="3"
               value={selectedTag}
-              onChange={(event) => setSelectedTag(event.target.value)}
+              onValueChange={(value) => setSelectedTag(value)}
               disabled={isLoadingTargetDetails || isUpdating}
-              style={{
-                width: "100%",
-                border: "1px solid var(--gray-7)",
-                borderRadius: "var(--radius-2)",
-                padding: "8px",
-                background: "var(--color-panel-solid)",
-                color: "var(--gray-12)",
-              }}
             >
-              {availableTags.map((tag) => (
-                <option key={tag} value={tag}>
-                  {tag}
-                  {tag === currentTag ? " (current)" : ""}
-                </option>
-              ))}
-            </select>
+              <Select.Trigger className="!w-full" />
+              <Select.Content>
+                {availableTags.map((tag) => (
+                  <Select.Item key={tag} value={tag}>
+                    {tag}
+                    {tag === currentTag ? " (current)" : ""}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
             {!hasRollbackOptions && (
               <Text
                 size="1"
@@ -586,6 +586,7 @@ export const UpdateCheckDialog: React.FC<UpdateCheckDialogProps> = ({
                   </Callout.Text>
                 </Callout.Root>
               )}
+
               <ReleaseLinkRow label="Current version" tag={currentTag} />
 
               <ReleaseLinkRow label="Target version" tag={selectedTag} />
