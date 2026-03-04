@@ -13,13 +13,18 @@ export const PluginDefinitionSchema = z.object({
         z.object({
           type: z.literal('site.action-bar'),
           tooltip: z.string().optional(),
+          admin: z.boolean().optional(),
           toggleble: z.literal(true),
+          icon: z.custom<React.FC>(),
           onToggle: z.function({
             input: [z.boolean()],
           })
         }),
         z.object({
           type: z.literal('site.action-bar'),
+          admin: z.boolean().optional(),
+          toggleble: z.literal(false),
+          icon: z.custom<React.FC>(),
           tooltip: z.string().optional(),
           onClick: z.function()
         }),

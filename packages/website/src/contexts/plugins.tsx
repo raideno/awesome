@@ -1,7 +1,4 @@
 // @ts-ignore: idk
-// TODO: just import it from the global no ? what is the purpose of a virtual thing ?
-// maybe less heavy and more pefromant ? if more performant then stick to it even for the list.
-import list_ from "virtual:awesome-list";
 // @ts-ignore: idk
 import plugins_ from "virtual:plugins";
 

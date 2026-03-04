@@ -8,6 +8,13 @@ export default {
   extensions: [
     {
       type: "site.action-bar",
+      icon: () => <span>🧪</span>,
+      tooltip: "Test Action",
+      admin: true,
+      toggleble: true,
+      onToggle: (toggled: boolean) => {
+        console.log(`Test Action toggled: ${toggled}`);
+      },
     },
   ]
 } satisfies PluginDefinition;

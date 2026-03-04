@@ -9,6 +9,7 @@ import {
 } from "@radix-ui/react-icons";
 import { Box, Card, Flex, IconButton, Tooltip } from "@radix-ui/themes";
 import { useLongPress } from "shared/hooks/long-press";
+import type { PluginDefinition } from "shared/types/plugins";
 
 import { useEditing } from "@/contexts/editing";
 import { useList } from "@/contexts/list";
@@ -21,6 +22,52 @@ import { SettingsDialog } from "@/components/modules/misc/settings-dialog";
 import { ResourceCreateSheet } from "@/components/modules/resource/create-sheet";
 import { useNetwork } from "@/contexts/network";
 import { usePlugins } from "@/contexts/plugins";
+
+type ActionBarExtension = Extract<
+  PluginDefinition["extensions"][number],
+  { type: "site.action-bar" }
+>;
+
+type ToggleableExtension = Extract<ActionBarExtension, { toggleble: true }>;
+type ClickableExtension = Extract<ActionBarExtension, { togglebal: false }>;
+
+interface PluginActionBarButtonProps {
+  extension: ActionBarExtension;
+}
+
+const PluginActionBarButton: React.FC<PluginActionBarButtonProps> = ({ extension }) => {
+  const [active, setActive] = React.useState(false);
+
+  const isToggleable = (ext: ActionBarExtension): ext is ToggleableExtension =>
+    "toggleble" in ext && ext.toggleble === true;
+
+  const button = isToggleable(extension) ? (
+    <IconButton
+      variant={active ? "solid" : "classic"}
+      onClick={() => {
+        const next = !active;
+        setActive(next);
+        extension.onToggle(next);
+      }}
+      aria-pressed={active}
+    >
+      <extension.icon />
+    </IconButton>
+  ) : (
+    <IconButton
+      variant="classic"
+      onClick={() => (extension as ClickableExtension).onClick()}
+    >
+      <extension.icon />
+    </IconButton>
+  );
+
+  if (extension.tooltip) {
+    return <Tooltip content={extension.tooltip}>{button}</Tooltip>;
+  }
+
+  return button;
+};
 
 export interface FloatingActionBarProps {}
 
@@ -64,8 +111,6 @@ export const FloatingActionBar: React.FC<FloatingActionBarProps> = () => {
     onClick: handleToggleEditing,
     thresholdInMilliseconds: 500,
   });
-
-  console.log(plugins.plugins)
 
   return (
     <>
@@ -113,21 +158,13 @@ export const FloatingActionBar: React.FC<FloatingActionBarProps> = () => {
 
               <ThemeSwitchButton />
 
-              {
-                plugins.plugins
-                  .flatMap((plugin) => plugin.extensions)
-                  .filter((extension) => extension.type === "site.action-bar")
-                  .map((extension, index) => {
-                    return (
-                      <IconButton
-                        key={index}
-                        variant="classic"
-                      >
-                          <StarIcon />
-                      </IconButton>
-                    )
-                  })
-              }
+              {plugins.plugins
+                .flatMap((plugin) => plugin.extensions)
+                .filter((ext): ext is ActionBarExtension => ext.type === "site.action-bar")
+                .filter((ext) => !ext.admin || editingEnabled)
+                .map((extension, index) => (
+                  <PluginActionBarButton key={index} extension={extension} />
+                ))}
 
               <Tooltip content="Click to toggle editing, Long-press for settings">
                 <IconButton
