@@ -7,6 +7,9 @@ inputs:
   yaml-path:
     description: "Path to the YAML file to use as data source."
     required: true
+  plugins-directory-path:
+    description: "Optional path to a directory containing custom plugins. Default is 'plugins' in the repository root."
+    required: false
   base-path:
     description: "Optional base path (e.g. /my-site/) to host under. Default is the repository name to support github pages."
     required: false
@@ -104,6 +107,7 @@ runs:
       env:
         BASE_PATH: ${{ steps.base.outputs.value }}
         LIST_FILE_PATH: ${{ inputs.yaml-path }}
+        PLUGINS_DIRECTORY_PATH: ${{ inputs.plugins-directory-path }}
         GITHUB_REPOSITORY_URL: https://github.com/${{ github.repository }}
         USER_REPOSITORY_COMMIT_HASH: ${{ steps.user-commit.outputs.hash }}
         AWESOME_WEBSITE_TAG: ${{ steps.awesome-tag.outputs.tag }}

@@ -4,13 +4,20 @@ import { ContextMenu } from "@radix-ui/themes";
 import { toast } from "sonner";
 
 import type { AwesomeListElement } from "shared/types/awesome-list";
+import type { PluginDefinition } from "shared/types/plugins";
 
 import { useList } from "@/contexts/list";
+import { usePlugins } from "@/contexts/plugins";
 
 import { OnlyWhenEditingEnabled } from "@/components/layout/only-when-editing-enabled";
 import { ResourceEditSheet } from "@/components/modules/resource/edit-sheet";
 import { AdminOnly } from "@/components/utils/admin-only";
 import { useConfirm } from "@/components/utils/alert-dialog";
+
+type CardContextAction = Extract<
+  PluginDefinition["extensions"][number],
+  { type: "card.context-action" }
+>;
 
 export interface ResourceCardContextMenuProps {
   children?: React.ReactNode;
@@ -23,6 +30,14 @@ export const ResourceCardContextMenu: React.FC<
   const [open, setOpen] = React.useState(false);
   const list = useList();
   const confirm = useConfirm();
+  const { plugins } = usePlugins();
+
+  const cardContextActions = plugins
+    .flatMap((plugin) => plugin.extensions)
+    .filter((ext): ext is CardContextAction => ext.type === "card.context-action");
+
+  const publicActions = cardContextActions.filter((a) => !a.admin);
+  const adminActions = cardContextActions.filter((a) => a.admin);
 
   const handleDeleteButtonClick = async () => {
     if (!list.canEdit) {
@@ -58,7 +73,6 @@ export const ResourceCardContextMenu: React.FC<
 
     try {
       await navigator.clipboard.writeText(element.link);
-
       toast.success("Link copied to clipboard");
     } catch (error) {
       toast.error(
@@ -78,10 +92,26 @@ export const ResourceCardContextMenu: React.FC<
             Copy
           </ContextMenu.Item>
 
-          {/* Admin-only menu items are also gated by the editing toggle via AdminOnly */}
+          {publicActions.length > 0 && (
+            <>
+              <ContextMenu.Separator />
+              {publicActions.map((action) => (
+                <ContextMenu.Item key={action.name} onClick={() => action.onClick()}>
+                  {action.name}
+                </ContextMenu.Item>
+              ))}
+            </>
+          )}
+
+          {/* Admin-only items (built-in + admin plugin actions) gated by editing toggle */}
           <AdminOnly>
             <OnlyWhenEditingEnabled>
               <ContextMenu.Separator />
+              {adminActions.map((action) => (
+                <ContextMenu.Item key={action.name} onClick={() => action.onClick()}>
+                  {action.name}
+                </ContextMenu.Item>
+              ))}
               <ContextMenu.Item
                 disabled={!list.canEdit}
                 onClick={() => setOpen(true)}

@@ -22,6 +22,13 @@ import type { AwesomeListElement } from "shared/types/awesome-list";
 import { useEditing } from "@/contexts/editing";
 import { useFilter } from "@/contexts/filter";
 import { useList } from "@/contexts/list";
+import { usePlugins } from "@/contexts/plugins";
+import type { PluginDefinition } from "shared/types/plugins";
+
+type GroupContextAction = Extract<
+  PluginDefinition["extensions"][number],
+  { type: "group.context-action" }
+>;
 
 import { GroupsControllerFactory } from "@/components/controllers/groups-input";
 import { OnlyWhenEditingEnabled } from "@/components/layout/only-when-editing-enabled";
@@ -47,6 +54,14 @@ const GroupContainer: React.FC<{
   const [renameDialogOpen, setRenameDialogOpen] = React.useState(false);
   const { editingEnabled } = useEditing();
   const list = useList();
+  const { plugins } = usePlugins();
+
+  const groupContextActions = plugins
+    .flatMap((plugin) => plugin.extensions)
+    .filter((ext): ext is GroupContextAction => ext.type === "group.context-action");
+
+  const publicGroupActions = groupContextActions.filter((a) => !a.admin);
+  const adminGroupActions = groupContextActions.filter((a) => a.admin);
 
   const groups = Array.from(
     new Set(
@@ -100,7 +115,7 @@ const GroupContainer: React.FC<{
   return (
     <>
       <ContextMenu.Root>
-        <ContextMenu.Trigger disabled={!editingEnabled}>
+        <ContextMenu.Trigger disabled={!editingEnabled && publicGroupActions.length === 0}>
           <Card
             className="transition-all contain-none"
             style={{
@@ -143,8 +158,23 @@ const GroupContainer: React.FC<{
           </Card>
         </ContextMenu.Trigger>
         <ContextMenu.Content>
+          {publicGroupActions.length > 0 && (
+            <>
+              {publicGroupActions.map((action) => (
+                <ContextMenu.Item key={action.name} onClick={() => action.onClick()}>
+                  {action.name}
+                </ContextMenu.Item>
+              ))}
+              <ContextMenu.Separator />
+            </>
+          )}
           <OnlyWhenEditingEnabled>
             <AdminOnly>
+              {adminGroupActions.map((action) => (
+                <ContextMenu.Item key={action.name} onClick={() => action.onClick()}>
+                  {action.name}
+                </ContextMenu.Item>
+              ))}
               <ContextMenu.Item onClick={() => setCreateSheetOpen(true)}>
                 <Flex align="center" gap="2">
                   <PlusIcon />

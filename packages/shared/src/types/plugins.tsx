@@ -32,11 +32,13 @@ export const PluginDefinitionSchema = z.object({
       z.object({
         type: z.literal('card.context-action'),
         name: z.string(),
+        admin: z.boolean().optional(),
         onClick: z.function()
       }),
       z.object({
-        type: z.literal('group.context-actionn'),
+        type: z.literal('group.context-action'),
         name: z.string(),
+        admin: z.boolean().optional(),
         onClick: z.function()
       }),
       z.object({
