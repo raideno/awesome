@@ -20,6 +20,7 @@ import { PushChangesDialog } from "@/components/modules/misc/push-changes-dialog
 import { SettingsDialog } from "@/components/modules/misc/settings-dialog";
 import { ResourceCreateSheet } from "@/components/modules/resource/create-sheet";
 import { useNetwork } from "@/contexts/network";
+import { usePlugins } from "@/contexts/plugins";
 
 export interface FloatingActionBarProps {}
 
@@ -31,8 +32,14 @@ export const FloatingActionBar: React.FC<FloatingActionBarProps> = () => {
 
   const network = useNetwork();
   const list = useList();
+  const plugins = usePlugins();
+
   const { hasUnsavedChanges, content } = list;
   const { editingEnabled, setEditingEnabled } = useEditing();
+
+  // TODO: consider them while loading, we might integrate some async initiatiation method on the plugins later.
+  plugins.isLoading;
+  plugins.error;
 
   const isPushingDisabled: [boolean, string] =
     network.state === "offline"
@@ -57,6 +64,8 @@ export const FloatingActionBar: React.FC<FloatingActionBarProps> = () => {
     onClick: handleToggleEditing,
     thresholdInMilliseconds: 500,
   });
+
+  console.log(plugins.plugins)
 
   return (
     <>
@@ -103,6 +112,22 @@ export const FloatingActionBar: React.FC<FloatingActionBarProps> = () => {
               )}
 
               <ThemeSwitchButton />
+
+              {
+                plugins.plugins
+                  .flatMap((plugin) => plugin.extensions)
+                  .filter((extension) => extension.type === "site.action-bar")
+                  .map((extension, index) => {
+                    return (
+                      <IconButton
+                        key={index}
+                        variant="classic"
+                      >
+                          <StarIcon />
+                      </IconButton>
+                    )
+                  })
+              }
 
               <Tooltip content="Click to toggle editing, Long-press for settings">
                 <IconButton

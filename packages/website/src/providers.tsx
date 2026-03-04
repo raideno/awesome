@@ -13,6 +13,7 @@ import { MarkersProvider } from "@/contexts/markers";
 import { NetworkProvider } from "@/contexts/network";
 
 import { AlertDialogProvider } from "@/components/utils/alert-dialog";
+import { PluginsProvider } from "./contexts/plugins";
 
 export interface ProvidersProps {
   children: React.ReactNode;
@@ -39,12 +40,14 @@ export const Providers: React.FC<ProvidersProps> = ({ children }) => {
             <NetworkProvider>
               <EditingProvider>
                 <ListProvider>
-                  <FilterProvider>
-                    <MarkersProvider>
-                      <Toaster />
-                      <>{children}</>
-                    </MarkersProvider>
-                  </FilterProvider>
+                  <PluginsProvider>
+                    <FilterProvider>
+                      <MarkersProvider>
+                        <Toaster />
+                        <>{children}</>
+                      </MarkersProvider>
+                    </FilterProvider>
+                  </PluginsProvider>
                 </ListProvider>
               </EditingProvider>
             </NetworkProvider>

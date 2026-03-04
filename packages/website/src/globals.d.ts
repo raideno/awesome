@@ -21,3 +21,5 @@ declare const __CONFIGURATION__: {
     path: string;
   };
 };
+
+declare const __PLUGINS__: Array<any>;

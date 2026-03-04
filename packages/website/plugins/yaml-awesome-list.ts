@@ -9,6 +9,8 @@ import type { AwesomeList } from "shared/types/awesome-list";
 
 export const loadAwesomeList = (listPath: string | undefined): AwesomeList => {
   if (!listPath) {
+    // TODO: it's not environment variable anymore in here + we shouldn't accept undefined
+    // This is directly handled by the zod validation on env variables.
     throw new Error("LIST_FILE_PATH environment variable is not set");
   }
 
