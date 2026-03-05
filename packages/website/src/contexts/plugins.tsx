@@ -7,6 +7,7 @@ import React, { createContext, useContext } from "react";
 
 import type { PluginDefinition, PluginContext } from "shared/types/plugins";
 import { useQuery } from "@tanstack/react-query";
+import { experimental_streamedQuery as streamedQuery } from '@tanstack/react-query'
 
 /**
  * We have multiple options when it comes to installation of plugins, given the list of plugins:
@@ -48,14 +49,10 @@ export const usePlugins = () => {
   return context;
 };
 
-export const PluginsProvider: React.FC<{ children: React.ReactNode, blocking?: boolean }> = ({
+export const PluginsProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
-  blocking = false
 }) => {
   const plugins = plugins_ as Array<PluginDefinition>;
-
-  const [ready, setReady] = React.useState<Array<string>>([]);
-  const [contexts, setContexts] = React.useState<Map<string, PluginContext>>(new Map());
 
   /**
    * As a first plugin, we'll have only an action sidebar extension.
@@ -73,46 +70,46 @@ export const PluginsProvider: React.FC<{ children: React.ReactNode, blocking?: b
     * [ ] Install a plugin from a file link or a file by committing it. Plugin filename will be its id.
     */
 
-  const { data, isLoading, error } = useQuery({
+    /**
+     * TODO: can we stream the results of the useQuery to the data to not use another state ?
+     */
+
+
+  const { isLoading, error, data } = useQuery<Array<{ pluginId: string, context: PluginContext }>>({
     queryKey: ["plugins"],
-    queryFn: async () => {
-      return await Promise.all(
-        plugins.map(async (plugin) => {
-          try {
-            const context: PluginContext = {
-              plugin: plugin,
-              toast: toast,
-              storage: {
-                read: async (name: string) => "",
-                write: async (name: string, content: string) => { },
-                list: async () => []
-              }
-            };
+    initialData: [],
+    queryFn: streamedQuery({
+      streamFn: async () => {
+        async function* initPlugins() {
+          for (const plugin of plugins) {
+            try {
+              const context: PluginContext = {
+                plugin: plugin,
+                toast: toast,
+                storage: {
+                  read: async (name: string) => "",
+                  write: async (name: string, content: string) => {},
+                  list: async () => []
+                }
+              };
 
-            setReady((prev) => [...prev, plugin.id]);
-            setContexts((prev) => new Map(prev).set(plugin.id, context));
-
-            return {
-              pluginId: plugin.id,
-              context,
+              yield {
+                pluginId: plugin.id,
+                context,
+              };
+            } catch (error) {
+              console.error(`Failed to initialize plugin "${plugin.id}":`, error);
             }
-          } catch (error) {
-            console.error(`Failed to initialize plugin "${plugin.id}":`, error);
           }
-        }),
-      );
-    },
+        }
+
+        return initPlugins();
+      },
+    }),
   });
 
   const context = (id: string): PluginContext => {
-    if (!contexts)
-      throw new Error("Plugins are still loading. Please wait until they're loaded to access their context.");
-
-    // const pluginContext = data.find((p) => p?.pluginId === id)?.context;
-
-    const pluginContext = contexts.get(id);
-
-    console.log(contexts, ready)
+    const pluginContext = data.find((p) => p.pluginId === id)?.context;
 
     if(!pluginContext) {
       throw new Error(`Plugin with id "${id}" not found or failed to initialize.`);
@@ -121,18 +118,10 @@ export const PluginsProvider: React.FC<{ children: React.ReactNode, blocking?: b
     return pluginContext;
   };
 
-  /**
-   * TODO: do some nice loading screen with some loading for each extension.
-   * Or we can just wrap the places were there is an extension that requires loading with some <WhenPluginsLoaded> component that will show a loading screen until the plugins are loaded, and then show the extension.
-   */
-  if (blocking)
-    if (isLoading)
-      return <div>Loading plugins...</div>;
-
   return (
     <PluginsContext.Provider
       value={{
-        ready: ready,
+        ready: data.map((p) => p.pluginId),
         plugins: plugins_,
         context: context,
         isLoading: isLoading,

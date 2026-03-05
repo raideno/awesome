@@ -22,7 +22,6 @@ import { SettingsDialog } from "@/components/modules/misc/settings-dialog";
 import { ResourceCreateSheet } from "@/components/modules/resource/create-sheet";
 import { useNetwork } from "@/contexts/network";
 import { usePlugins, type PluginsContextType } from "@/contexts/plugins";
-import { useQuery } from "@tanstack/react-query";
 
 type ActionBarExtension = Extract<
   PluginDefinition["extensions"][number],
@@ -30,7 +29,6 @@ type ActionBarExtension = Extract<
 >;
 
 type ToggleableExtension = Extract<ActionBarExtension, { toggleble: true }>;
-type ClickableExtension = Extract<ActionBarExtension, { togglebal: false }>;
 
 interface PluginActionBarButtonProps {
   context: Awaited<ReturnType<PluginsContextType["context"]>>;
@@ -40,8 +38,8 @@ interface PluginActionBarButtonProps {
 const PluginActionBarButton: React.FC<PluginActionBarButtonProps> = ({ context, extension }) => {
   const [active, setActive] = React.useState(false);
 
-  const isToggleable = (ext: ActionBarExtension): ext is ToggleableExtension =>
-    "toggleble" in ext && ext.toggleble === true;
+  const isToggleable = (extension: ActionBarExtension): extension is ToggleableExtension =>
+    "toggleble" in extension && extension.toggleble === true;
 
   const button = isToggleable(extension) ? (
     <IconButton

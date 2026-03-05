@@ -54,11 +54,12 @@ const GroupContainer: React.FC<{
   const [renameDialogOpen, setRenameDialogOpen] = React.useState(false);
   const { editingEnabled } = useEditing();
   const list = useList();
-  const { plugins } = usePlugins();
+  const plugins = usePlugins();
 
-  const groupContextActions = plugins
+  const groupContextActions = plugins.plugins
+    .map((plugin) => ({ ...plugin, extensions: plugin.extensions.map((extension) => ({ ...extension, pluginId: plugin.id }))}))
     .flatMap((plugin) => plugin.extensions)
-    .filter((ext): ext is GroupContextAction => ext.type === "group.context-action");
+    .filter((extension) => extension.type === "group.context-action") as Array<GroupContextAction & { pluginId: string }>;
 
   const publicGroupActions = groupContextActions.filter((a) => !a.admin);
   const adminGroupActions = groupContextActions.filter((a) => a.admin);
@@ -161,7 +162,7 @@ const GroupContainer: React.FC<{
           {publicGroupActions.length > 0 && (
             <>
               {publicGroupActions.map((action) => (
-                <ContextMenu.Item key={action.name} onClick={() => action.onClick()}>
+                <ContextMenu.Item key={action.name} onClick={() => action.onClick(plugins.context(action.pluginId))}>
                   {action.name}
                 </ContextMenu.Item>
               ))}
@@ -171,7 +172,7 @@ const GroupContainer: React.FC<{
           <OnlyWhenEditingEnabled>
             <AdminOnly>
               {adminGroupActions.map((action) => (
-                <ContextMenu.Item key={action.name} onClick={() => action.onClick()}>
+                <ContextMenu.Item key={action.name} onClick={() => action.onClick(plugins.context(action.pluginId))}>
                   {action.name}
                 </ContextMenu.Item>
               ))}

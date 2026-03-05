@@ -30,11 +30,12 @@ export const ResourceCardContextMenu: React.FC<
   const [open, setOpen] = React.useState(false);
   const list = useList();
   const confirm = useConfirm();
-  const { plugins } = usePlugins();
+  const plugins = usePlugins();
 
-  const cardContextActions = plugins
+  const cardContextActions = plugins.plugins
+    .map((plugin) => ({ ...plugin, extensions: plugin.extensions.map((extension) => ({ ...extension, pluginId: plugin.id }))}))
     .flatMap((plugin) => plugin.extensions)
-    .filter((ext): ext is CardContextAction => ext.type === "card.context-action");
+    .filter((extension) => extension.type === "card.context-action") as Array<CardContextAction & { pluginId: string }>;
 
   const publicActions = cardContextActions.filter((a) => !a.admin);
   const adminActions = cardContextActions.filter((a) => a.admin);
@@ -96,7 +97,7 @@ export const ResourceCardContextMenu: React.FC<
             <>
               <ContextMenu.Separator />
               {publicActions.map((action) => (
-                <ContextMenu.Item key={action.name} onClick={() => action.onClick()}>
+                <ContextMenu.Item key={action.name} onClick={() => action.onClick(plugins.context(action.pluginId))}>
                   {action.name}
                 </ContextMenu.Item>
               ))}
@@ -108,7 +109,7 @@ export const ResourceCardContextMenu: React.FC<
             <OnlyWhenEditingEnabled>
               <ContextMenu.Separator />
               {adminActions.map((action) => (
-                <ContextMenu.Item key={action.name} onClick={() => action.onClick()}>
+                <ContextMenu.Item key={action.name} onClick={() => action.onClick(plugins.context(action.pluginId))}>
                   {action.name}
                 </ContextMenu.Item>
               ))}

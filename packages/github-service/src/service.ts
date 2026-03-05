@@ -190,43 +190,7 @@ export class GitHubService {
     }
   }
 
-  async getLatestCommit(branch: string = "main"): Promise<{
-    sha: string;
-    commit: {
-      message: string;
-      author: {
-        name: string;
-        date: string;
-      };
-    };
-    html_url: string;
-  }> {
-    try {
-      const response = await this.octokit.rest.repos.getCommit({
-        owner: this.config.owner,
-        repo: this.config.repo,
-        ref: branch,
-      });
-
-      return {
-        sha: response.data.sha,
-        commit: {
-          message: response.data.commit.message,
-          author: {
-            name: response.data.commit.author?.name || "Unknown",
-            date: response.data.commit.author?.date || "",
-          },
-        },
-        html_url: response.data.html_url,
-      };
-    } catch (error) {
-      throw new Error(
-        `Failed to get latest commit: ${error instanceof Error ? error.message : "Unknown error"}`,
-      );
-    }
-  }
-
-  async getLatestTag(): Promise<TagInfo> {
+  async getLatestTag() {
     try {
       const tags = await this.listTags(1);
       const latestTag = tags[0];
@@ -243,7 +207,7 @@ export class GitHubService {
     }
   }
 
-  async listTags(perPage: number = 30): Promise<TagInfo[]> {
+  async listTags(perPage: number = 30) {
     try {
       const response = await this.octokit.rest.repos.listTags({
         owner: this.config.owner,
@@ -471,65 +435,4 @@ export class GitHubService {
     }
   }
 
-  async triggerWorkflow(
-    workflowId: string | number,
-    ref: string = "main",
-    inputs?: Record<string, unknown>,
-  ): Promise<void> {
-    try {
-      await this.octokit.rest.actions.createWorkflowDispatch({
-        owner: this.config.owner,
-        repo: this.config.repo,
-        workflow_id: workflowId,
-        ref,
-        inputs,
-      });
-    } catch (error) {
-      throw new Error(
-        `Failed to trigger workflow: ${error instanceof Error ? error.message : "Unknown error"}`,
-      );
-    }
-  }
-
-  async getCommitsBetween(
-    baseSha: string,
-    headSha: string,
-  ): Promise<{
-    commits: Array<{
-      sha: string;
-      message: string;
-      author: {
-        name: string;
-        date: string;
-      };
-      html_url: string;
-    }>;
-    totalCount: number;
-  }> {
-    try {
-      const response = await this.octokit.rest.repos.compareCommits({
-        owner: this.config.owner,
-        repo: this.config.repo,
-        base: baseSha,
-        head: headSha,
-      });
-
-      return {
-        commits: response.data.commits.map((commit) => ({
-          sha: commit.sha,
-          message: commit.commit.message,
-          author: {
-            name: commit.commit.author?.name || "Unknown",
-            date: commit.commit.author?.date || "",
-          },
-          html_url: commit.html_url,
-        })),
-        totalCount: response.data.total_commits || response.data.commits.length,
-      };
-    } catch (error) {
-      throw new Error(
-        `Failed to get commits between: ${error instanceof Error ? error.message : "Unknown error"}`,
-      );
-    }
-  }
 }
