@@ -21,7 +21,8 @@ import { PushChangesDialog } from "@/components/modules/misc/push-changes-dialog
 import { SettingsDialog } from "@/components/modules/misc/settings-dialog";
 import { ResourceCreateSheet } from "@/components/modules/resource/create-sheet";
 import { useNetwork } from "@/contexts/network";
-import { usePlugins } from "@/contexts/plugins";
+import { usePlugins, type PluginsContextType } from "@/contexts/plugins";
+import { useQuery } from "@tanstack/react-query";
 
 type ActionBarExtension = Extract<
   PluginDefinition["extensions"][number],
@@ -32,10 +33,11 @@ type ToggleableExtension = Extract<ActionBarExtension, { toggleble: true }>;
 type ClickableExtension = Extract<ActionBarExtension, { togglebal: false }>;
 
 interface PluginActionBarButtonProps {
+  context: Awaited<ReturnType<PluginsContextType["context"]>>;
   extension: ActionBarExtension;
 }
 
-const PluginActionBarButton: React.FC<PluginActionBarButtonProps> = ({ extension }) => {
+const PluginActionBarButton: React.FC<PluginActionBarButtonProps> = ({ context, extension }) => {
   const [active, setActive] = React.useState(false);
 
   const isToggleable = (ext: ActionBarExtension): ext is ToggleableExtension =>
@@ -47,7 +49,7 @@ const PluginActionBarButton: React.FC<PluginActionBarButtonProps> = ({ extension
       onClick={() => {
         const next = !active;
         setActive(next);
-        extension.onToggle(next);
+        extension.onToggle(context, next);
       }}
       aria-pressed={active}
     >
@@ -56,7 +58,7 @@ const PluginActionBarButton: React.FC<PluginActionBarButtonProps> = ({ extension
   ) : (
     <IconButton
       variant="classic"
-      onClick={() => (extension as ClickableExtension).onClick()}
+      onClick={() => extension.onClick(context)}
     >
       <extension.icon />
     </IconButton>
@@ -83,10 +85,6 @@ export const FloatingActionBar: React.FC<FloatingActionBarProps> = () => {
 
   const { hasUnsavedChanges, content } = list;
   const { editingEnabled, setEditingEnabled } = useEditing();
-
-  // TODO: consider them while loading, we might integrate some async initiatiation method on the plugins later.
-  plugins.isLoading;
-  plugins.error;
 
   const isPushingDisabled: [boolean, string] =
     network.state === "offline"
@@ -158,13 +156,14 @@ export const FloatingActionBar: React.FC<FloatingActionBarProps> = () => {
 
               <ThemeSwitchButton />
 
-              {plugins.plugins
-                .flatMap((plugin) => plugin.extensions)
-                .filter((ext): ext is ActionBarExtension => ext.type === "site.action-bar")
-                .filter((ext) => !ext.admin || editingEnabled)
-                .map((extension, index) => (
-                  <PluginActionBarButton key={index} extension={extension} />
-                ))}
+                {(plugins.plugins
+                  .map((plugin) => ({ ...plugin, extensions: plugin.extensions.map((extension) => ({ ...extension, pluginId: plugin.id })) }))
+                  .flatMap((plugin) => plugin.extensions))
+                  .filter((extension) => extension.type === "site.action-bar")
+                  .filter((extension) => !extension.admin || editingEnabled)
+                  .filter((extension) => plugins.ready.includes(extension.pluginId))
+                  .map((extension, index) => <PluginActionBarButton key={index} extension={extension} context={plugins.context(extension.pluginId)} />)
+                }
 
               <Tooltip content="Click to toggle editing, Long-press for settings">
                 <IconButton

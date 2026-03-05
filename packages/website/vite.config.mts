@@ -150,6 +150,30 @@ export default vite.defineConfig({
       },
     } satisfies typeof __CONFIGURATION__,
   },
+  optimizeDeps: {
+    // Force Vite to discover and pre-bundle all deps used by the `shared`
+    // alias (which lives outside the project root) during the initial scan.
+    // Without this, Vite finds new imports mid-session, regenerates chunks
+    // with a new browserHash, and the browser requests the old chunk names
+    // which no longer exist — resulting in 404s and a blank page.
+    include: [
+      "react",
+      "react/jsx-runtime",
+      "react/jsx-dev-runtime",
+      "react-dom",
+      "react-dom/client",
+      "sonner",
+      "zod/v4",
+      "clsx",
+      "tailwind-merge",
+      "@radix-ui/themes",
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-icons",
+      "@radix-ui/react-toggle-group",
+      "@raideno/auto-form/registry",
+      "@raideno/auto-form/ui",
+    ],
+  },
   base: Environment.BASE_PATH,
   resolve: {
     alias: {

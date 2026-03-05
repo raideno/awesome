@@ -11,9 +11,9 @@ export default {
       icon: () => <span>🧪</span>,
       tooltip: "Test Action",
       admin: true,
-      toggleble: true,
-      onToggle: (toggled: boolean) => {
-        console.log(`Test Action toggled: ${toggled}`);
+      toggleble: false,
+      onClick: (context) => {
+        context.toast.info("Test site action bar button clicked");
       },
     },
     {

@@ -2,9 +2,11 @@
 // @ts-ignore: idk
 import plugins_ from "virtual:plugins";
 
+import { toast } from "sonner";
 import React, { createContext, useContext } from "react";
 
-import type { PluginDefinition } from "shared/types/plugins";
+import type { PluginDefinition, PluginContext } from "shared/types/plugins";
+import { useQuery } from "@tanstack/react-query";
 
 /**
  * We have multiple options when it comes to installation of plugins, given the list of plugins:
@@ -25,8 +27,15 @@ import type { PluginDefinition } from "shared/types/plugins";
 
 export interface PluginsContextType {
   plugins: Array<PluginDefinition>;
+  /**
+   *
+   * @param id The pluginId.
+   * @returns A context object specific to the plugin with the given id, or an error if the plugin doesn't exist or if there was an issue while creating the context.
+   */
+  context: (id: string) => PluginContext;
   isLoading: boolean;
-  error: string | null;
+  ready: Array<string>;
+  error: Error | null;
 }
 
 const PluginsContext = createContext<PluginsContextType | undefined>(undefined);
@@ -39,9 +48,15 @@ export const usePlugins = () => {
   return context;
 };
 
-export const PluginsProvider: React.FC<{ children: React.ReactNode }> = ({
+export const PluginsProvider: React.FC<{ children: React.ReactNode, blocking?: boolean }> = ({
   children,
+  blocking = false
 }) => {
+  const plugins = plugins_ as Array<PluginDefinition>;
+
+  const [ready, setReady] = React.useState<Array<string>>([]);
+  const [contexts, setContexts] = React.useState<Map<string, PluginContext>>(new Map());
+
   /**
    * As a first plugin, we'll have only an action sidebar extension.
    */
@@ -58,12 +73,70 @@ export const PluginsProvider: React.FC<{ children: React.ReactNode }> = ({
     * [ ] Install a plugin from a file link or a file by committing it. Plugin filename will be its id.
     */
 
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["plugins"],
+    queryFn: async () => {
+      return await Promise.all(
+        plugins.map(async (plugin) => {
+          try {
+            const context: PluginContext = {
+              plugin: plugin,
+              toast: toast,
+              storage: {
+                read: async (name: string) => "",
+                write: async (name: string, content: string) => { },
+                list: async () => []
+              }
+            };
+
+            setReady((prev) => [...prev, plugin.id]);
+            setContexts((prev) => new Map(prev).set(plugin.id, context));
+
+            return {
+              pluginId: plugin.id,
+              context,
+            }
+          } catch (error) {
+            console.error(`Failed to initialize plugin "${plugin.id}":`, error);
+          }
+        }),
+      );
+    },
+  });
+
+  const context = (id: string): PluginContext => {
+    if (!contexts)
+      throw new Error("Plugins are still loading. Please wait until they're loaded to access their context.");
+
+    // const pluginContext = data.find((p) => p?.pluginId === id)?.context;
+
+    const pluginContext = contexts.get(id);
+
+    console.log(contexts, ready)
+
+    if(!pluginContext) {
+      throw new Error(`Plugin with id "${id}" not found or failed to initialize.`);
+    }
+
+    return pluginContext;
+  };
+
+  /**
+   * TODO: do some nice loading screen with some loading for each extension.
+   * Or we can just wrap the places were there is an extension that requires loading with some <WhenPluginsLoaded> component that will show a loading screen until the plugins are loaded, and then show the extension.
+   */
+  if (blocking)
+    if (isLoading)
+      return <div>Loading plugins...</div>;
+
   return (
     <PluginsContext.Provider
       value={{
+        ready: ready,
         plugins: plugins_,
-        isLoading: false,
-        error: null,
+        context: context,
+        isLoading: isLoading,
+        error: error,
       }}
     >
       {children}
