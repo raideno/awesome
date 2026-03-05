@@ -4,9 +4,20 @@ import plugins_ from "virtual:plugins";
 import buildTimeStorage from "virtual:plugin-storage";
 
 import { toast } from "sonner";
-import React, { createContext, useContext, useCallback, useRef } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useRef,
+  useState,
+} from "react";
 
-import type { PluginDefinition, PluginContext } from "shared/types/plugins";
+import type {
+  PluginDefinition,
+  PluginContext,
+  PluginStateAdapter,
+  PluginContextSetup,
+} from "shared/types/plugins";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { experimental_streamedQuery as streamedQuery } from "@tanstack/react-query";
 
@@ -34,33 +45,49 @@ export interface PluginsContextType {
   storage: {
     staged: {
       /**
-      * All pending storage writes that have not yet been committed to the repository.
-      */
+       * All pending storage writes that have not yet been committed to the repository.
+       */
       content: StagedPluginStorage;
       /**
-      * Whether any plugin has uncommitted storage changes.
-      */
+       * Whether any plugin has uncommitted storage changes.
+       */
       has: boolean;
       /**
-      * Clears all staged plugin storage changes without committing them.
-      */
+       * Clears all staged plugin storage changes without committing them.
+       */
       clear: () => void;
       /**
-      * Called after a successful push to mark the staged state as clean.
-      */
+       * Called after a successful push to mark the staged state as clean.
+       */
       sync: () => void;
     };
-  }
+  };
 }
+
+/**
+ * A snapshot of all registered adapters across all plugins.
+ * Shape: pluginId → key → adapter
+ *
+ * Stored in React state so that components calling a `use()` hook returned by
+ * `setup.register()` re-render when the snapshot reference changes (i.e. when
+ * any adapter calls its setter).
+ */
+type AdapterSnapshot = Record<string, Record<string, PluginStateAdapter>>;
 
 const PluginsContext = createContext<PluginsContextType | undefined>(undefined);
 
+/**
+ * Holds the latest adapter snapshot. Plugin components subscribe to this
+ * context through the `use` hook returned by `setup.register()`, so they
+ * re-render only when an adapter value changes — independently of the heavier
+ * PluginsContext.
+ */
+const PluginAdapterContext = createContext<AdapterSnapshot>({});
+
 export const usePlugins = () => {
-  const context = useContext(PluginsContext);
-  if (!context) {
-    throw new Error("usePlugins must be used within a PluginsProvider");
-  }
-  return context;
+  const ctx = useContext(PluginsContext);
+  if (!ctx) throw new Error("usePlugins must be used within a PluginsProvider");
+  return ctx;
 };
 
 const storagePathFor = (pluginId: string, filename: string) =>
@@ -89,14 +116,28 @@ export const PluginsProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const github = useRepositoryService();
 
-  // Keep a ref that always points to the latest stagedStorage so that storage
-  // closures captured inside the query (which only re-runs on token changes)
-  // never read stale staged data.
+  // Ref so that storage closures captured inside the query (which only
+  // re-runs on token changes) always read the latest staged data.
   const stagedStorageRef = useRef(stagedStorage);
   stagedStorageRef.current = stagedStorage;
 
+  // ---------------------------------------------------------------------------
+  // Adapter snapshot — updated whenever a plugin calls adapter.set()
+  // ---------------------------------------------------------------------------
+
+  const [adapterSnapshot, setAdapterSnapshot] = useState<AdapterSnapshot>({});
+
+  // Ref so that setup.register() closures always see the latest snapshot
+  // without needing to be re-created on every render.
+  const adapterSnapshotRef = useRef(adapterSnapshot);
+  adapterSnapshotRef.current = adapterSnapshot;
+
+  // ---------------------------------------------------------------------------
+  // Storage factory
+  // ---------------------------------------------------------------------------
+
   const makeStorage = useCallback(
-    (pluginId: string) => {
+    (pluginId: string): PluginContext["storage"] => {
       const read = async (filename: string): Promise<string> => {
         if (stagedStorageRef.current[pluginId]?.[filename] !== undefined) {
           return stagedStorageRef.current[pluginId][filename];
@@ -105,22 +146,15 @@ export const PluginsProvider: React.FC<{ children: React.ReactNode }> = ({
         try {
           const file = await github.read(storagePathFor(pluginId, filename));
           return file.content;
-        } catch {
-        }
+        } catch {}
 
         return buildTimeStorage?.[pluginId]?.[filename] ?? "";
       };
 
-      const write = async (
-        filename: string,
-        content: string,
-      ): Promise<void> => {
+      const write = async (filename: string, content: string): Promise<void> => {
         setStagedStorage((prev) => ({
           ...prev,
-          [pluginId]: {
-            ...(prev[pluginId] ?? {}),
-            [filename]: content,
-          },
+          [pluginId]: { ...(prev[pluginId] ?? {}), [filename]: content },
         }));
       };
 
@@ -132,10 +166,8 @@ export const PluginsProvider: React.FC<{ children: React.ReactNode }> = ({
           const remote = entries
             .filter((e) => e.type === "file")
             .map((e) => e.name);
-
           return [...new Set([...remote, ...staged])];
-        } catch {
-        }
+        } catch {}
 
         const buildTime = Object.keys(buildTimeStorage?.[pluginId] ?? {});
         return [...new Set([...buildTime, ...staged])];
@@ -145,6 +177,55 @@ export const PluginsProvider: React.FC<{ children: React.ReactNode }> = ({
     },
     [github, setStagedStorage],
   );
+
+  // ---------------------------------------------------------------------------
+  // Setup factory — handed to the plugin's createContext so it can register
+  // its own state adapters. The framework wraps each adapter's setter so that
+  // calling it bumps the React snapshot and triggers re-renders.
+  // ---------------------------------------------------------------------------
+
+  const makeSetup = useCallback(
+    (pluginId: string): PluginContextSetup => ({
+      register: <T,>(key: string, adapter: PluginStateAdapter<T>) => {
+        // Wrap the plugin's setter: call the original, then bump the snapshot
+        // so React re-renders any component holding the returned `use` hook.
+        const wrappedSet = (value: T) => {
+          adapter.set(value);
+          setAdapterSnapshot((prev) => ({
+            ...prev,
+            [pluginId]: {
+              ...(prev[pluginId] ?? {}),
+              // Store a wrapped adapter so the context value is a new reference.
+              [key]: { get: adapter.get, set: wrappedSet } as PluginStateAdapter,
+            },
+          }));
+        };
+
+        // Register immediately so the adapter is available before first render.
+        setAdapterSnapshot((prev) => ({
+          ...prev,
+          [pluginId]: {
+            ...(prev[pluginId] ?? {}),
+            [key]: { get: adapter.get, set: wrappedSet } as PluginStateAdapter,
+          },
+        }));
+
+        // Return a React hook the plugin can embed in its components.
+        const use = (): [T, (value: T) => void] => {
+          // eslint-disable-next-line react-hooks/rules-of-hooks
+          useContext(PluginAdapterContext); // subscribe to snapshot changes
+          return [adapter.get() as T, wrappedSet];
+        };
+
+        return use;
+      },
+    }),
+    [],
+  );
+
+  // ---------------------------------------------------------------------------
+  // Plugin initialisation query
+  // ---------------------------------------------------------------------------
 
   const { isLoading, error, data } = useQuery<
     Array<{ pluginId: string; context: PluginContext }>
@@ -163,12 +244,11 @@ export const PluginsProvider: React.FC<{ children: React.ReactNode }> = ({
                 storage: makeStorage(plugin.id),
               };
 
+              plugin.context?.setup?.(context, makeSetup(plugin.id));
+
               yield { pluginId: plugin.id, context };
-            } catch (error) {
-              console.error(
-                `Failed to initialize plugin "${plugin.id}":`,
-                error,
-              );
+            } catch (err) {
+              console.error(`Failed to initialize plugin "${plugin.id}":`, err);
             }
           }
         }
@@ -200,24 +280,26 @@ export const PluginsProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   return (
-    <PluginsContext.Provider
-      value={{
-        ready: data.map((p) => p.pluginId),
-        plugins: plugins_,
-        context,
-        isLoading,
-        error,
-        storage: {
-          staged: {
-            content: stagedStorage,
-            has: hasStagedStorageChanges,
-            sync: syncStagedStorage,
-            clear: clearStagedStorage,
+    <PluginAdapterContext.Provider value={adapterSnapshot}>
+      <PluginsContext.Provider
+        value={{
+          ready: data.map((p) => p.pluginId),
+          plugins: plugins_,
+          context,
+          isLoading,
+          error,
+          storage: {
+            staged: {
+              content: stagedStorage,
+              has: hasStagedStorageChanges,
+              sync: syncStagedStorage,
+              clear: clearStagedStorage,
+            },
           },
-        }
-      }}
-    >
-      {children}
-    </PluginsContext.Provider>
+        }}
+      >
+        {children}
+      </PluginsContext.Provider>
+    </PluginAdapterContext.Provider>
   );
 };
