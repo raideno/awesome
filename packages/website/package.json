@@ -20,7 +20,7 @@
     "@uiw/react-md-editor": "^4.0.8",
     "clsx": "^2.1.1",
     "dotenv-cli": "^9.0.0",
-    "@raideno/github-service": "file:../github-service",
+    "storage-service": "file:../services/storage",
     "js-yaml": "^4.1.0",
     "react": "^19.0.0",
     "react-diff-viewer-continued": "^4.1.2",

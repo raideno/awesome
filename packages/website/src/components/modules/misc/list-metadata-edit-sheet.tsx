@@ -2,36 +2,32 @@ import { useState, type ComponentProps } from "react";
 
 import { Heading, ScrollArea, Text } from "@radix-ui/themes";
 import { AutoForm } from "@raideno/auto-form/ui";
-import { AwesomeListMetadata } from "shared/types/awesome-list";
+import { AwesomeListMetadata } from "shared/types/list";
 import { toast } from "sonner";
 
 import type React from "react";
 
 import { Sheet } from "@/components/ui/sheet";
 import { useList } from "@/contexts/list";
+import { useModals } from "@/contexts/dialogs";
 
 export interface ListMetadataEditSheetProps {
   children?: React.ReactNode;
-  state?: { open: boolean; onOpenChange: (open: boolean) => void };
 }
 
 export const ListMetadataEditSheet: React.FC<ListMetadataEditSheetProps> = ({
   children,
-  state,
 }) => {
   const list = useList();
 
-  const [internalOpen, setInternalOpen] = useState(false);
-
-  const isOpen = state?.open ?? internalOpen;
-  const setOpen = state?.onOpenChange ?? setInternalOpen;
+  const { isOpen, setOpen } = useModals("metadata-edit-sheet");
 
   const handleSubmit: ComponentProps<
     typeof AutoForm.Root<typeof AwesomeListMetadata>
   >["onSubmit"] = async (data, tag, _helpers) => {
     if (tag === "submit") {
       try {
-        await list.updateList({
+        await list.update({
           ...data,
         });
         setOpen(false);

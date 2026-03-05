@@ -22,6 +22,7 @@ import { SettingsDialog } from "@/components/modules/misc/settings-dialog";
 import { ResourceCreateSheet } from "@/components/modules/resource/create-sheet";
 import { useNetwork } from "@/contexts/network";
 import { usePlugins, type PluginsContextType } from "@/contexts/plugins";
+import { useModals } from "@/contexts/dialogs";
 
 type ActionBarExtension = Extract<
   PluginDefinition["extensions"][number],
@@ -72,10 +73,10 @@ const PluginActionBarButton: React.FC<PluginActionBarButtonProps> = ({ context, 
 export interface FloatingActionBarProps {}
 
 export const FloatingActionBar: React.FC<FloatingActionBarProps> = () => {
-  const [editMetadataOpen, setEditMetadataOpen] = React.useState(false);
-  const [createResourceOpen, setCreateResourceOpen] = React.useState(false);
-  const [pushChangesOpen, setPushChangesOpen] = React.useState(false);
-  const [settingsOpen, setSettingsOpen] = React.useState(false);
+  const { setOpen: setCreateSheetOpen } = useModals("element.create.sheet");
+  const { setOpen: setSettingsOpen } = useModals("settings");
+  const { setOpen: setPushChangesOpen } = useModals("push-changes-dialog");
+  const { setOpen: setEditMetadataOpen } = useModals("metadata-edit-sheet");
 
   const network = useNetwork();
   const list = useList();
@@ -87,7 +88,7 @@ export const FloatingActionBar: React.FC<FloatingActionBarProps> = () => {
   const isPushingDisabled: [boolean, string] =
     network.state === "offline"
       ? [true, "No internet available to push changes."]
-      : !hasUnsavedChanges
+      : !hasUnsavedChanges && !plugins.storage.staged.has
         ? [true, "No changes detected."]
         : [false, "Push changes."];
 
@@ -95,7 +96,7 @@ export const FloatingActionBar: React.FC<FloatingActionBarProps> = () => {
     const next = !editingEnabled;
     setEditingEnabled(next);
     if (!next) {
-      setCreateResourceOpen(false);
+      setCreateSheetOpen(false);
       setEditMetadataOpen(false);
     }
   };
@@ -138,7 +139,7 @@ export const FloatingActionBar: React.FC<FloatingActionBarProps> = () => {
                   <IconButton
                     variant="classic"
                     disabled={!list.canEdit}
-                    onClick={() => setCreateResourceOpen(true)}
+                    onClick={() => setCreateSheetOpen(true)}
                   >
                     <PlusIcon />
                   </IconButton>
@@ -179,26 +180,12 @@ export const FloatingActionBar: React.FC<FloatingActionBarProps> = () => {
         </Flex>
       </Box>
 
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
+      <SettingsDialog />
 
       <OnlyWhenEditingEnabled>
-        <PushChangesDialog
-          yamlContent={content.new}
-          open={pushChangesOpen}
-          onOpenChange={setPushChangesOpen}
-        />
-        <ListMetadataEditSheet
-          state={{
-            open: editMetadataOpen,
-            onOpenChange: setEditMetadataOpen,
-          }}
-        />
-        <ResourceCreateSheet
-          state={{
-            open: createResourceOpen,
-            onOpenChange: setCreateResourceOpen,
-          }}
-        />
+        <PushChangesDialog yamlContent={content.new} />
+        <ListMetadataEditSheet />
+        <ResourceCreateSheet />
       </OnlyWhenEditingEnabled>
     </>
   );

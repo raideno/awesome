@@ -1,42 +1,56 @@
 // @ts-ignore: idk
-// @ts-ignore: idk
 import plugins_ from "virtual:plugins";
+// @ts-ignore: idk
+import buildTimeStorage from "virtual:plugin-storage";
 
 import { toast } from "sonner";
-import React, { createContext, useContext } from "react";
+import React, { createContext, useContext, useCallback, useRef } from "react";
 
 import type { PluginDefinition, PluginContext } from "shared/types/plugins";
-import { useQuery } from "@tanstack/react-query";
-import { experimental_streamedQuery as streamedQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { experimental_streamedQuery as streamedQuery } from "@tanstack/react-query";
+
+import { useGitHubAuth } from "@/hooks/github-auth";
+import { useCommitAwareStorage } from "@/hooks/commit-aware-storage";
+import { useRepositoryService } from "@/hooks/repository-service";
+import { useList } from "@/contexts/list";
 
 /**
- * We have multiple options when it comes to installation of plugins, given the list of plugins:
- * - Save the url of the plugin into the list.yaml, at each build we download the plugin and buundle it into the website.
- *   This is a bit problematic as plugins might change over time and users will have different versions each time they update their website's content and a new build tirggers.
- *   Plus it might introduce security issues as a plugin that was originally safe might become malicious after some time, and users that update their website's content will automatically get the malicious version without being aware of it.
- * - Save plugin's code on installation when install is clicked, we commit the plugin's code/file into the repository which will ensure it'll be fetched and loaded during next build and thus make it available.
- *   We need some vite plugin that'll be given a directory where plugins leave and the vite plugin will automatically load all of them, verify they're valid and make the available in the website.
+ * Staged plugin storage — a map of pluginId → filename → content.
+ * Changes are accumulated here and pushed to GitHub via the push-changes dialog.
  */
-
- /**
-  * Ok so now when it comes to plugin's access to libraries, plugins should have access to the libraries installed in the website, such as radix-ui, autoform, etc.
-  * It should also be possible for plugins to declare their own dependencies.
-  * Maybe plugins should be a full blown npm package like with a package.json file ?
-  *
-  * For now we're ignoring this, plugins won't have access to any package.
-  */
+export type StagedPluginStorage = Record<string, Record<string, string>>;
 
 export interface PluginsContextType {
   plugins: Array<PluginDefinition>;
   /**
-   *
-   * @param id The pluginId.
-   * @returns A context object specific to the plugin with the given id, or an error if the plugin doesn't exist or if there was an issue while creating the context.
+   * Returns the context object for a given plugin id.
+   * Throws if the plugin doesn't exist or failed to initialize.
    */
   context: (id: string) => PluginContext;
   isLoading: boolean;
   ready: Array<string>;
   error: Error | null;
+  storage: {
+    staged: {
+      /**
+      * All pending storage writes that have not yet been committed to the repository.
+      */
+      content: StagedPluginStorage;
+      /**
+      * Whether any plugin has uncommitted storage changes.
+      */
+      has: boolean;
+      /**
+      * Clears all staged plugin storage changes without committing them.
+      */
+      clear: () => void;
+      /**
+      * Called after a successful push to mark the staged state as clean.
+      */
+      sync: () => void;
+    };
+  }
 }
 
 const PluginsContext = createContext<PluginsContextType | undefined>(undefined);
@@ -49,34 +63,93 @@ export const usePlugins = () => {
   return context;
 };
 
+const storagePathFor = (pluginId: string, filename: string) =>
+  `${__CONFIGURATION__.storage.path}/${pluginId}/${filename}`;
+
+const storageDirFor = (pluginId: string) =>
+  `${__CONFIGURATION__.storage.path}/${pluginId}`;
+
 export const PluginsProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const plugins = plugins_ as Array<PluginDefinition>;
+  const githubAuth = useGitHubAuth();
+  const queryClient = useQueryClient();
+  const list = useList();
 
-  /**
-   * As a first plugin, we'll have only an action sidebar extension.
-   */
-  /**
-   * [ ] Add a plugins directory parameter to the website build. Default value being ./plugins.
-   * [ ] Make a vite plugin to load these plugins and verify them against the PluginDefinition schema, rewrite it correctly in zod.
-   * [ ] Provide these plugins in a glboal. They'll be accessible everywhere.
-   */
+  const {
+    data: stagedStorage,
+    setData: setStagedStorage,
+    clearData: clearStagedStorage,
+  } = useCommitAwareStorage<StagedPluginStorage>(
+    "plugin-storage-changes",
+    __CONFIGURATION__.repository.commit,
+    {},
+  );
 
-   /**
-    * In this plugins context, we'll manage the part for installing new plugins.
-    * [ ] Accept a repository link.
-    * [ ] Fetch plugins there.
-    * [ ] Install a plugin from a file link or a file by committing it. Plugin filename will be its id.
-    */
+  const github = useRepositoryService();
 
-    /**
-     * TODO: can we stream the results of the useQuery to the data to not use another state ?
-     */
+  // Keep a ref that always points to the latest stagedStorage so that storage
+  // closures captured inside the query (which only re-runs on token changes)
+  // never read stale staged data.
+  const stagedStorageRef = useRef(stagedStorage);
+  stagedStorageRef.current = stagedStorage;
 
+  const makeStorage = useCallback(
+    (pluginId: string) => {
+      const read = async (filename: string): Promise<string> => {
+        if (stagedStorageRef.current[pluginId]?.[filename] !== undefined) {
+          return stagedStorageRef.current[pluginId][filename];
+        }
 
-  const { isLoading, error, data } = useQuery<Array<{ pluginId: string, context: PluginContext }>>({
-    queryKey: ["plugins"],
+        try {
+          const file = await github.read(storagePathFor(pluginId, filename));
+          return file.content;
+        } catch {
+        }
+
+        return buildTimeStorage?.[pluginId]?.[filename] ?? "";
+      };
+
+      const write = async (
+        filename: string,
+        content: string,
+      ): Promise<void> => {
+        setStagedStorage((prev) => ({
+          ...prev,
+          [pluginId]: {
+            ...(prev[pluginId] ?? {}),
+            [filename]: content,
+          },
+        }));
+      };
+
+      const list = async (): Promise<Array<string>> => {
+        const staged = Object.keys(stagedStorageRef.current[pluginId] ?? {});
+
+        try {
+          const entries = await github.list(storageDirFor(pluginId));
+          const remote = entries
+            .filter((e) => e.type === "file")
+            .map((e) => e.name);
+
+          return [...new Set([...remote, ...staged])];
+        } catch {
+        }
+
+        const buildTime = Object.keys(buildTimeStorage?.[pluginId] ?? {});
+        return [...new Set([...buildTime, ...staged])];
+      };
+
+      return { read, write, list };
+    },
+    [github, setStagedStorage],
+  );
+
+  const { isLoading, error, data } = useQuery<
+    Array<{ pluginId: string; context: PluginContext }>
+  >({
+    queryKey: ["plugins", githubAuth.token],
     initialData: [],
     queryFn: streamedQuery({
       streamFn: async () => {
@@ -84,21 +157,18 @@ export const PluginsProvider: React.FC<{ children: React.ReactNode }> = ({
           for (const plugin of plugins) {
             try {
               const context: PluginContext = {
-                plugin: plugin,
-                toast: toast,
-                storage: {
-                  read: async (name: string) => "",
-                  write: async (name: string, content: string) => {},
-                  list: async () => []
-                }
+                plugin,
+                toast,
+                list,
+                storage: makeStorage(plugin.id),
               };
 
-              yield {
-                pluginId: plugin.id,
-                context,
-              };
+              yield { pluginId: plugin.id, context };
             } catch (error) {
-              console.error(`Failed to initialize plugin "${plugin.id}":`, error);
+              console.error(
+                `Failed to initialize plugin "${plugin.id}":`,
+                error,
+              );
             }
           }
         }
@@ -111,11 +181,22 @@ export const PluginsProvider: React.FC<{ children: React.ReactNode }> = ({
   const context = (id: string): PluginContext => {
     const pluginContext = data.find((p) => p.pluginId === id)?.context;
 
-    if(!pluginContext) {
-      throw new Error(`Plugin with id "${id}" not found or failed to initialize.`);
+    if (!pluginContext) {
+      throw new Error(
+        `Plugin with id "${id}" not found or failed to initialize.`,
+      );
     }
 
     return pluginContext;
+  };
+
+  const hasStagedStorageChanges = Object.keys(stagedStorage).some(
+    (pluginId) => Object.keys(stagedStorage[pluginId]).length > 0,
+  );
+
+  const syncStagedStorage = () => {
+    queryClient.invalidateQueries({ queryKey: ["plugins"] });
+    clearStagedStorage();
   };
 
   return (
@@ -123,9 +204,17 @@ export const PluginsProvider: React.FC<{ children: React.ReactNode }> = ({
       value={{
         ready: data.map((p) => p.pluginId),
         plugins: plugins_,
-        context: context,
-        isLoading: isLoading,
-        error: error,
+        context,
+        isLoading,
+        error,
+        storage: {
+          staged: {
+            content: stagedStorage,
+            has: hasStagedStorageChanges,
+            sync: syncStagedStorage,
+            clear: clearStagedStorage,
+          },
+        }
       }}
     >
       {children}

@@ -1,6 +1,6 @@
 import React from 'react'
 
-import type { AwesomeListElement } from 'shared/types/awesome-list'
+import type { AwesomeListElement } from 'shared/types/list'
 
 import { useFilter } from '@/contexts/filter'
 import { useList } from '@/contexts/list'

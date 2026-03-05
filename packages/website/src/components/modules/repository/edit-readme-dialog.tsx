@@ -57,7 +57,7 @@ export const EditReadmeDialog: React.FC<EditReadmeDialogProps> = ({
   const handleReadmeChange = async (value: string | undefined) => {
     if (canEdit) {
       try {
-        await list.updateList({
+        await list.update({
           readme: value || "",
         });
       } catch (error) {

@@ -1,6 +1,6 @@
 import yaml from "js-yaml";
 import type { Plugin } from "vite";
-import type { AwesomeList } from "shared/types/awesome-list";
+import type { AwesomeList } from "shared/types/list";
 
 /**
  * Generate a markdown representation of the awesome list

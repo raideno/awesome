@@ -2,7 +2,7 @@ import { TextField } from "@radix-ui/themes";
 
 import type React from "react";
 
-import type { AwesomeListElement } from "shared/types/awesome-list";
+import type { AwesomeListElement } from "shared/types/list";
 
 import { type ControllerParams } from "@raideno/auto-form/registry";
 

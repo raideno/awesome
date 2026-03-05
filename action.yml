@@ -100,7 +100,7 @@ runs:
     - name: build internal packages
       run: |
         cd awesome-src
-        npm run build --workspace @raideno/github-service
+        npm run build --workspace storage-service
       shell: bash
 
     - name: build awesome website

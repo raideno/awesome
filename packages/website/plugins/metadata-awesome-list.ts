@@ -1,6 +1,6 @@
 import { METADATA_ELEMENT_IDS } from 'shared/constants'
 
-import type { AwesomeList } from 'shared/types/awesome-list'
+import type { AwesomeList } from 'shared/types/list'
 import type { Plugin } from 'vite'
 
 export type MetadataElementId =

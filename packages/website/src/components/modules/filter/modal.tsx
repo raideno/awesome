@@ -38,7 +38,7 @@ export const TagFilterModal: React.FC<FilterModalProps> = ({
 
   const [search, setSearch] = React.useState<string>('')
 
-  const { allTags } = useList()
+  const { tags: allTags } = useList()
 
   const modalFilteredTags = allTags.filter((tag) =>
     tag.toLowerCase().includes(search.toLowerCase()),

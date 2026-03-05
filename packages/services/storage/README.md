@@ -1,4 +1,4 @@
-# @raideno/github-service
+# storage-service
 
 Reusable GitHub client utilities for this monorepo.
 

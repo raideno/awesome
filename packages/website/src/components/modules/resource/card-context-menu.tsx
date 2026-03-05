@@ -3,7 +3,7 @@ import React from "react";
 import { ContextMenu } from "@radix-ui/themes";
 import { toast } from "sonner";
 
-import type { AwesomeListElement } from "shared/types/awesome-list";
+import type { AwesomeListElement } from "shared/types/list";
 import type { PluginDefinition } from "shared/types/plugins";
 
 import { useList } from "@/contexts/list";
@@ -33,9 +33,9 @@ export const ResourceCardContextMenu: React.FC<
   const plugins = usePlugins();
 
   const cardContextActions = plugins.plugins
-    .map((plugin) => ({ ...plugin, extensions: plugin.extensions.map((extension) => ({ ...extension, pluginId: plugin.id }))}))
+    .map((plugin) => ({ ...plugin, extensions: plugin.extensions.map((extension) => ({ ...extension, pluginId: plugin.id })) }))
     .flatMap((plugin) => plugin.extensions)
-    .filter((extension) => extension.type === "card.context-action") as Array<CardContextAction & { pluginId: string }>;
+    .filter((extension) => extension.type === "card.context-action");
 
   const publicActions = cardContextActions.filter((a) => !a.admin);
   const adminActions = cardContextActions.filter((a) => a.admin);
@@ -53,7 +53,7 @@ export const ResourceCardContextMenu: React.FC<
 
     if (confirmation) {
       try {
-        await list.updateList({
+        await list.update({
           elements: list.content.new.elements.filter(
             (el) => el.name !== element.name,
           ),

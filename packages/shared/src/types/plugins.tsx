@@ -1,5 +1,9 @@
 import { z } from 'zod/v4';
 import { toast } from "sonner";
+import type { AwesomeListElement } from "./list";
+
+// TODO: correct the import
+import type { ListContextType } from "../../../website/src/contexts/list"
 
 // TODO: properly setup function types with the right context and inputs.
 
@@ -8,6 +12,10 @@ export interface PluginContext {
    * A sonner toast component.
    */
   toast: typeof toast;
+  /**
+   *
+   */
+  list: ListContextType;
   /**
    * The plugin's metadata.
    */
@@ -76,11 +84,9 @@ export const PluginExtensionSchema = z.union([
     })
   }),
   z.object({
-    type: z.literal('card.modal-content')
+    type: z.literal('card.modal-content'),
+    render: z.custom<React.FC<{ element: AwesomeListElement; context: PluginContext }>>(),
   }),
-  z.object({
-    type: z.literal('card.edit-sidebar')
-  })
 ]);
 
 export type PluginExtension = z.infer<typeof PluginExtensionSchema>;

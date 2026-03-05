@@ -11,13 +11,15 @@ import metadataAwesomeList from "./plugins/metadata-awesome-list";
 import yamlAwesomeListPlugin, {
   loadAwesomeList,
 } from "./plugins/yaml-awesome-list";
-import awesomePluginsPlugin, { loadPlugins } from "./plugins/awesome-plugins";
+import awesomePluginsPlugin from "./plugins/awesome-plugins";
+import pluginStoragePlugin from "./plugins/plugin-storage";
 
 const EnvironmentSchema = z
   .looseObject({
     BASE_PATH: z.string().nonempty(),
     LIST_FILE_PATH: z.string().nonempty(),
     PLUGINS_DIRECTORY_PATH: z.string().optional(),
+    STORAGE_DIRECTORY_PATH: z.string().optional().default("storage"),
     GITHUB_REPOSITORY_URL: z.string().nonempty(),
     USER_REPOSITORY_COMMIT_HASH: z.string().optional().default(""),
     AWESOME_WEBSITE_TAG: z.string().optional().default("unknown"),
@@ -80,13 +82,13 @@ const EnvironmentSchema = z
 const Environment = EnvironmentSchema.parse(process.env);
 
 const AWESOME_LIST = loadAwesomeList(Environment.LIST_FILE_PATH);
-const PLUGINS = await loadPlugins(Environment.PLUGINS_DIRECTORY_PATH);
 
 export default vite.defineConfig({
   plugins: [
     viteReact(),
     yamlAwesomeListPlugin(Environment.LIST_FILE_PATH),
     awesomePluginsPlugin(Environment.PLUGINS_DIRECTORY_PATH),
+    pluginStoragePlugin(Environment.STORAGE_DIRECTORY_PATH),
     metadataAwesomeList(AWESOME_LIST, Environment.GITHUB_REPOSITORY_URL),
     listFormatsPlugin(AWESOME_LIST),
     VitePWA({
@@ -128,7 +130,6 @@ export default vite.defineConfig({
     environment: "jsdom",
   },
   define: {
-    __PLUGINS__: PLUGINS satisfies typeof __PLUGINS__,
     __CONFIGURATION__: {
       repository: {
         url: Environment.GITHUB_REPOSITORY_URL,
@@ -147,6 +148,9 @@ export default vite.defineConfig({
       list: {
         content: AWESOME_LIST,
         path: Environment.LIST_FILE_PATH,
+      },
+      storage: {
+        path: Environment.STORAGE_DIRECTORY_PATH,
       },
     } satisfies typeof __CONFIGURATION__,
   },

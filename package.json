@@ -1,16 +1,18 @@
 {
-    "name": "awesome-monorepo",
-    "private": false,
-    "workspaces": [
-        "packages/*"
-    ],
-    "scripts": {
-        "build": "npm run build --workspaces --if-present",
-        "dev": "npm run dev --workspaces --if-present",
-        "lint": "npm run lint --workspaces --if-present",
-        "test": "npm run test --workspaces --if-present"
-    },
-    "dependencies": {
-        "octokit": "^5.0.5"
-    }
+  "name": "awesome-monorepo",
+  "private": false,
+  "workspaces": [
+    "packages/shared",
+    "packages/website",
+    "packages/services/storage"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "dev": "npm run dev --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  },
+  "dependencies": {
+    "octokit": "^5.0.5"
+  }
 }

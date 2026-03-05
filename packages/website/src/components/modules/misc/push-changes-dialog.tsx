@@ -1,3 +1,5 @@
+import * as yaml from "js-yaml";
+
 import { Portal } from "@radix-ui/react-dialog";
 import { ExclamationTriangleIcon } from "@radix-ui/react-icons";
 import {
@@ -9,6 +11,7 @@ import {
   Heading,
   Text,
   Tabs,
+  Badge,
 } from "@radix-ui/themes";
 import { MetadataRegistry } from "@raideno/auto-form/registry";
 import { AutoForm } from "@raideno/auto-form/ui";
@@ -19,20 +22,20 @@ import ReactDiffViewer from "react-diff-viewer-continued";
 import { toast } from "sonner";
 
 import { useTheme } from "shared/contexts/theme";
-import type { AwesomeList } from "shared/types/awesome-list";
+import type { AwesomeList } from "shared/types/list";
 
 import { useList } from "@/contexts/list";
+import { usePlugins } from "@/contexts/plugins";
 import { useGitHubAuth } from "@/hooks/github-auth";
-import { getWorkflowStatus } from "@/hooks/workflow-status";
-import { GitHubService } from "@raideno/github-service";
+import { createRepositoryService } from "@/hooks/repository-service";
 
-import * as yaml from "js-yaml";
+// @ts-ignore: idk
+import buildTimeStorage from "virtual:plugin-storage";
+import { useModals } from "@/contexts/dialogs";
 
 interface PushChangesDialogProps {
   children?: React.ReactNode;
   yamlContent: AwesomeList;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
 }
 
 const PushChangesFormSchema = z.object({
@@ -52,21 +55,17 @@ const PushChangesFormSchema = z.object({
 export const PushChangesDialog: React.FC<PushChangesDialogProps> = ({
   children,
   yamlContent,
-  open: controlledOpen,
-  onOpenChange: controlledOnOpenChange,
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
   const githubAuth = useGitHubAuth();
-  const { clearChanges, syncRemoteList, content } = useList();
+  const { clear: clearChanges, syncRemoteList, content } = useList();
+  const { storage }  = usePlugins();
   const { theme } = useTheme();
 
-  const dialogOpen = controlledOpen !== undefined ? controlledOpen : isOpen;
-  const setDialogOpen = controlledOnOpenChange || setIsOpen;
+  const { isOpen: dialogOpen, setOpen: setDialogOpen } = useModals("push-changes-dialog");
 
-  // Generate YAML content for old and new versions
   const { oldYaml, newYaml, hasYamlChanges } = useMemo(() => {
-    const { readme: oldReadme, ...oldYamlData } = content.old;
-    const { readme: newReadme, ...newYamlData } = yamlContent;
+    const { readme: _oldReadme, ...oldYamlData } = content.old;
+    const { readme: _newReadme, ...newYamlData } = yamlContent;
 
     const oldYaml = yaml.dump(oldYamlData, {
       indent: 2,
@@ -79,24 +78,42 @@ export const PushChangesDialog: React.FC<PushChangesDialogProps> = ({
       noRefs: true,
     });
 
-    return {
-      oldYaml,
-      newYaml,
-      hasYamlChanges: oldYaml !== newYaml,
-    };
+    return { oldYaml, newYaml, hasYamlChanges: oldYaml !== newYaml };
   }, [content.old, yamlContent]);
 
-  // Check for README changes
   const { oldReadme, newReadme, hasReadmeChanges } = useMemo(() => {
     const oldReadme = content.old.readme || "";
     const newReadme = yamlContent.readme || "";
-
-    return {
-      oldReadme,
-      newReadme,
-      hasReadmeChanges: oldReadme !== newReadme,
-    };
+    return { oldReadme, newReadme, hasReadmeChanges: oldReadme !== newReadme };
   }, [content.old.readme, yamlContent.readme]);
+
+  /**
+   * Produces a flat list of { pluginId, filename, oldContent, newContent }
+   * for every staged file that has actually changed vs. the build-time snapshot.
+   */
+  const storageDiffs = useMemo(() => {
+    const diffs: Array<{
+      pluginId: string;
+      filename: string;
+      oldContent: string;
+      newContent: string;
+    }> = [];
+
+    for (const pluginId of Object.keys(storage.staged.content)) {
+      for (const filename of Object.keys(storage.staged.content[pluginId])) {
+        const newContent = storage.staged.content[pluginId][filename];
+        const oldContent = buildTimeStorage?.[pluginId]?.[filename] ?? "";
+
+        if (newContent !== oldContent) {
+          diffs.push({ pluginId, filename, oldContent, newContent });
+        }
+      }
+    }
+
+    return diffs;
+  }, [storage.staged.content]);
+
+  const hasStorageChanges = storageDiffs.length > 0;
 
   const handleError = () => {
     toast.error("Something is wrong with your inputs.");
@@ -115,23 +132,37 @@ export const PushChangesDialog: React.FC<PushChangesDialogProps> = ({
           return;
         }
 
-        const status = await getWorkflowStatus({ token: githubAuth.token });
-
-        if (status.isWorkflowRunning) {
-          toast.error("Build in progress", {
-            description:
-              "Cannot push changes while website is being updated. Please wait for the build to complete.",
-          });
-          return;
-        }
-
-        const github = new GitHubService({
+        const github = createRepositoryService({
           token: githubAuth.token,
           owner: __CONFIGURATION__.repository.owner,
           repo: __CONFIGURATION__.repository.name,
         });
 
-        await github.update(data.path, yamlContent, data.message);
+        // Commit list changes.
+        if (hasYamlChanges) {
+          const { readme: _readme, ...yamlData } = yamlContent;
+          const serialisedYaml = yaml.dump(yamlData, {
+            indent: 2,
+            lineWidth: -1,
+            noRefs: true,
+          });
+          await github.write(data.path, serialisedYaml, data.message);
+        }
+
+        if (hasReadmeChanges) {
+          const readmePath = data.path.replace(/[^/]+$/, "README.md");
+          await github.write(
+            readmePath,
+            yamlContent.readme ?? "",
+            `${data.message} (update README)`,
+          );
+        }
+
+        // Commit each staged plugin storage file.
+        for (const { pluginId, filename, newContent } of storageDiffs) {
+          const filePath = `${__CONFIGURATION__.storage.path}/${pluginId}/${filename}`;
+          await github.write(filePath, newContent, data.message);
+        }
 
         toast.success("Changes pushed successfully!", {
           description: "The repository has been updated",
@@ -139,8 +170,9 @@ export const PushChangesDialog: React.FC<PushChangesDialogProps> = ({
 
         setDialogOpen(false);
 
-        // NOTE: optimistic update, set the new list as the base list and clear changes to disable update button until new changes are made
+        // Optimistic update: mark local state as clean.
         syncRemoteList(yamlContent);
+        storage.staged.sync();
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : "An unexpected error occurred";
@@ -150,6 +182,7 @@ export const PushChangesDialog: React.FC<PushChangesDialogProps> = ({
       }
     } else if (tag === "discard") {
       clearChanges();
+      storage.staged.sync();
       setDialogOpen(false);
     } else {
       toast.error("Unknown action. Please try again.");
@@ -173,15 +206,13 @@ export const PushChangesDialog: React.FC<PushChangesDialogProps> = ({
           >
             <Flex direction="column" gap="4">
               <Box>
-                <>
-                  <Dialog.Title className="sr-only">
-                    Push Changes to Repository
-                  </Dialog.Title>
-                  <Dialog.Description className="sr-only">
-                    Review and confirm pushing your changes to the repository.
-                  </Dialog.Description>
-                </>
-                <Flex direction={"row"} align={"center"} justify={"between"}>
+                <Dialog.Title className="sr-only">
+                  Push Changes to Repository
+                </Dialog.Title>
+                <Dialog.Description className="sr-only">
+                  Review and confirm pushing your changes to the repository.
+                </Dialog.Description>
+                <Flex direction="row" align="center" justify="between">
                   <Heading>Push Changes to Repository</Heading>
                   <Button
                     type="button"
@@ -225,9 +256,18 @@ export const PushChangesDialog: React.FC<PushChangesDialogProps> = ({
                         README.md (Modified)
                       </Tabs.Trigger>
                     )}
+                    {hasStorageChanges && (
+                      <Tabs.Trigger value="storage">
+                        Plugin Storage{" "}
+                        <Badge ml="1" color="orange" variant="soft" size="1">
+                          {storageDiffs.length}
+                        </Badge>
+                      </Tabs.Trigger>
+                    )}
                   </Tabs.List>
 
                   <Box pt="3">
+                    {/* list.yaml diff */}
                     <Tabs.Content value="yaml">
                       {hasYamlChanges ? (
                         <Box
@@ -257,6 +297,7 @@ export const PushChangesDialog: React.FC<PushChangesDialogProps> = ({
                       )}
                     </Tabs.Content>
 
+                    {/* README.md diff */}
                     {hasReadmeChanges && (
                       <Tabs.Content value="readme">
                         <Box
@@ -279,12 +320,48 @@ export const PushChangesDialog: React.FC<PushChangesDialogProps> = ({
                         </Box>
                       </Tabs.Content>
                     )}
+
+                    {/* Plugin storage diffs */}
+                    {hasStorageChanges && (
+                      <Tabs.Content value="storage">
+                        <Flex direction="column" gap="3">
+                          {storageDiffs.map(
+                            ({ pluginId, filename, oldContent, newContent }) => (
+                              <Box key={`${pluginId}/${filename}`}>
+                                <Text size="2" weight="bold" mb="1" as="p">
+                                  {__CONFIGURATION__.storage.path}/{pluginId}/
+                                  {filename}
+                                </Text>
+                                <Box
+                                  style={{
+                                    maxHeight: "300px",
+                                    overflow: "auto",
+                                    border: "1px solid var(--gray-6)",
+                                    borderRadius: "var(--radius-2)",
+                                  }}
+                                >
+                                  <ReactDiffViewer
+                                    oldValue={oldContent}
+                                    newValue={newContent}
+                                    splitView={true}
+                                    useDarkTheme={theme === "dark"}
+                                    leftTitle="Current (Remote)"
+                                    rightTitle="New (Staged)"
+                                    hideLineNumbers={false}
+                                  />
+                                </Box>
+                              </Box>
+                            ),
+                          )}
+                        </Flex>
+                      </Tabs.Content>
+                    )}
                   </Box>
                 </Tabs.Root>
               </Box>
 
               <AutoForm.Actions>
-                <Flex direction={"column"} gap="3" justify="end">
+                <Flex direction="column" gap="3" justify="end">
                   <AutoForm.Action tag="discard" variant="soft" color="red">
                     Discard Changes
                   </AutoForm.Action>

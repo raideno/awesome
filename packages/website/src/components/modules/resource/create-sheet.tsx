@@ -3,7 +3,7 @@ import { useState, type ComponentProps } from "react";
 import { Heading, ScrollArea, Text } from "@radix-ui/themes";
 import { MetadataRegistry } from "@raideno/auto-form/registry";
 import { AutoForm } from "@raideno/auto-form/ui";
-import { AwesomeListElementSchema } from "shared/types/awesome-list";
+import { AwesomeListElementSchema } from "shared/types/list";
 import { toast } from "sonner";
 
 import type React from "react";
@@ -13,6 +13,7 @@ import { Sheet } from "@/components/ui/sheet";
 
 import { GroupsControllerFactory } from "@/components/controllers/groups-input";
 import { useList } from "@/contexts/list";
+import { useModals } from "@/contexts/dialogs";
 
 const generateUniqueId = (existingIds: Array<string>): string => {
   const existingIdsSet = new Set(existingIds);
@@ -38,16 +39,15 @@ const generateUniqueId = (existingIds: Array<string>): string => {
 
 export interface ResourceCreateSheetProps {
   children?: React.ReactNode;
-  state?: { open: boolean; onOpenChange: (open: boolean) => void };
   defaults?: Partial<Omit<z.infer<typeof AwesomeListElementSchema>, "id">>;
 }
 
 export const ResourceCreateSheet: React.FC<ResourceCreateSheetProps> = ({
   children,
-  state,
   defaults = {},
 }) => {
   const list = useList();
+  const { isOpen, setOpen } = useModals("element.create.sheet");
 
   const groups = Array.from(
     new Set(
@@ -63,17 +63,12 @@ export const ResourceCreateSheet: React.FC<ResourceCreateSheetProps> = ({
     }),
   });
 
-  const [internalOpen, setInternalOpen] = useState(false);
-
-  const isOpen = state?.open ?? internalOpen;
-  const setOpen = state?.onOpenChange ?? setInternalOpen;
-
   const handleSubmit: ComponentProps<
     typeof AutoForm.Root<typeof AwesomeListElementSchema>
   >["onSubmit"] = async (data, tag, _helpers) => {
     if (tag === "submit") {
       try {
-        await list.updateList({
+        await list.update({
           elements: [...list.content.new.elements, data],
         });
         setOpen(false);

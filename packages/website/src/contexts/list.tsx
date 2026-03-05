@@ -6,27 +6,26 @@ import React, { createContext, useContext, useMemo } from "react";
 
 import { useDocumentTitle } from "shared/hooks/document-title";
 import { useDynamicMetadata } from "shared/hooks/dynamic-metadata";
-import { AwesomeListSchema } from "shared/types/awesome-list";
+import { AwesomeListSchema } from "shared/types/list";
 import { deepEqual } from "shared/lib/utils";
 
-import type { AwesomeList } from "shared/types/awesome-list";
+import type { AwesomeList } from "shared/types/list";
 
-import { GitHubService } from "@raideno/github-service";
+import { useRepositoryService } from "@/hooks/repository-service";
 
 import * as yaml from "js-yaml";
 
 import { useCommitAwareStorage } from "@/hooks/commit-aware-storage";
 import { useGitHubAuth } from "@/hooks/github-auth";
-import { useWorkflowStatus } from "@/hooks/workflow-status";
 
-interface ListContextType {
+export interface ListContextType {
   content: {
     old: AwesomeList;
     new: AwesomeList;
   };
-  allTags: Array<string>;
-  updateList: (updates: Partial<AwesomeList>) => void;
-  clearChanges: () => void;
+  tags: Array<string>;
+  update: (updates: Partial<AwesomeList>) => void;
+  clear: () => void;
   syncRemoteList: (newList: AwesomeList) => void;
   hasUnsavedChanges: boolean;
   isWorkflowRunning: boolean;
@@ -49,7 +48,6 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const githubAuth = useGitHubAuth();
-  const { isWorkflowRunning, checkWorkflowStatus } = useWorkflowStatus();
   const queryClient = useQueryClient();
 
   const {
@@ -62,8 +60,10 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({
     {},
   );
 
+  const github = useRepositoryService();
+
   const enabled = Boolean(
-    githubAuth.isAuthenticated && githubAuth.token && !import.meta.env.DEV,
+    githubAuth.isAuthenticated && githubAuth.token,
   );
 
   const {
@@ -74,13 +74,7 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({
     queryKey: ["awesome-list"],
     queryFn: async () => {
       try {
-        const github = new GitHubService({
-          token: githubAuth.token || undefined,
-          owner: __CONFIGURATION__.repository.owner,
-          repo: __CONFIGURATION__.repository.name,
-        });
-
-        const file = await github.getFile(__CONFIGURATION__.list.path);
+        const file = await github.read(__CONFIGURATION__.list.path);
         const content = yaml.load(file.content);
 
         const parsing = AwesomeListSchema.safeParse(content);
@@ -94,7 +88,7 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({
             /[^/]+$/,
             "README.md",
           );
-          const readmeFile = await github.getFile(readmePath);
+          const readmeFile = await github.read(readmePath);
           list.readme = readmeFile.content;
         } catch (err) {
           console.warn("Failed to fetch remote README:", err);
@@ -126,12 +120,6 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [list]);
 
   const updateList = async (updates: Partial<AwesomeList>) => {
-    await checkWorkflowStatus();
-    if (isWorkflowRunning) {
-      throw new Error(
-        "Cannot edit while website is being updated. Please wait for the build to complete.",
-      );
-    }
     setChanges((prev: Partial<AwesomeList>) => ({ ...prev, ...updates }));
   };
 
@@ -158,7 +146,8 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({
     return false;
   }, [changes, list, baseList]);
 
-  const canEdit = !isWorkflowRunning;
+  // const canEdit = !isWorkflowRunning;
+  const canEdit = true;
   const error = queryError?.message || null;
 
   useDocumentTitle(hasUnsavedChanges);
@@ -171,12 +160,12 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({
           old: baseList,
           new: list,
         },
-        allTags,
-        updateList,
-        clearChanges,
+        tags: allTags,
+        update: updateList,
+        clear: clearChanges,
         syncRemoteList,
         hasUnsavedChanges,
-        isWorkflowRunning,
+        isWorkflowRunning: false,
         canEdit,
         isLoading,
         error,

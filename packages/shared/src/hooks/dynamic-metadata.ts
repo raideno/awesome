@@ -2,7 +2,7 @@ import { useEffect } from "react";
 
 import { METADATA_ELEMENT_IDS } from "../constants";
 
-import type { AwesomeList } from "../types/awesome-list";
+import type { AwesomeList } from "../types/list";
 
 function updateMetaContent(id: string, newContent: string) {
   const element = document.getElementById(id) as HTMLMetaElement | null;

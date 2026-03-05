@@ -17,7 +17,7 @@ import React, { type ComponentProps } from "react";
 import { toast } from "sonner";
 import { z } from "zod/v4";
 
-import type { AwesomeListElement } from "shared/types/awesome-list";
+import type { AwesomeListElement } from "shared/types/list";
 
 import { useEditing } from "@/contexts/editing";
 import { useFilter } from "@/contexts/filter";
@@ -88,7 +88,7 @@ const GroupContainer: React.FC<{
       }
 
       try {
-        await list.updateList({
+        await list.update({
           elements: list.content.new.elements.map((el) => {
             const elementGroup = el.group || "Ungrouped";
             const belongsToGroup = elementGroup === groupName;

@@ -1,7 +1,6 @@
 import React from "react";
 
 import { useList } from "@/contexts/list";
-import { useWorkflowStatus } from "@/hooks/workflow-status";
 import { GitHubLogoIcon, InfoCircledIcon } from "@radix-ui/react-icons";
 import {
   AspectRatio,
@@ -23,13 +22,14 @@ const MAX_HEADER_TAGS = 4;
 
 export const Header: React.FC<HeaderProps> = () => {
   const list = useList();
-  const { isWorkflowRunning } = useWorkflowStatus();
+
+  const isWorkflowRunning = false;
 
   const [showAllHeaderTags, setShowAllHeaderTags] = React.useState(false);
 
   const tags = showAllHeaderTags
-    ? list.allTags
-    : list.allTags.slice(0, MAX_HEADER_TAGS);
+    ? list.tags
+    : list.tags.slice(0, MAX_HEADER_TAGS);
 
   const commitHash = __CONFIGURATION__.repository.commit;
   const shortHash = commitHash ? commitHash.slice(0, 7) : "dev";
@@ -98,7 +98,7 @@ export const Header: React.FC<HeaderProps> = () => {
             {tag}
           </Badge>
         ))}
-        {list.allTags.length > MAX_HEADER_TAGS && (
+        {list.tags.length > MAX_HEADER_TAGS && (
           <Button
             className="!cursor-pointer"
             variant="outline"
@@ -107,7 +107,7 @@ export const Header: React.FC<HeaderProps> = () => {
           >
             {showAllHeaderTags
               ? "Show Less"
-              : `+${list.allTags.length - MAX_HEADER_TAGS} more`}
+              : `+${list.tags.length - MAX_HEADER_TAGS} more`}
           </Button>
         )}
       </Flex>
