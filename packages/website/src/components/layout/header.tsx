@@ -1,7 +1,9 @@
 import React from "react";
 
 import { useList } from "@/contexts/list";
-import { GitHubLogoIcon, InfoCircledIcon } from "@radix-ui/react-icons";
+import { usePlugins } from "@/contexts/plugins";
+import { useEditing } from "@/contexts/editing";
+import { GitHubLogoIcon } from "@radix-ui/react-icons";
 import {
   AspectRatio,
   Badge,
@@ -9,16 +11,45 @@ import {
   Button,
   Flex,
   Heading,
-  IconButton,
   Link,
   Text,
   Tooltip,
 } from "@radix-ui/themes";
-import { EditReadmeDialog } from "../modules/repository/edit-readme-dialog";
+import type { PluginDefinition } from "shared/types/plugins";
 
 export interface HeaderProps {}
 
 const MAX_HEADER_TAGS = 4;
+
+type HeaderActionExtension = Extract<
+  PluginDefinition["extensions"][number],
+  { type: "site.header-action" }
+>;
+
+const HeaderActionExtensions: React.FC = () => {
+  const plugins = usePlugins();
+  const { editingEnabled } = useEditing();
+
+  const extensions = plugins.plugins
+    .map((plugin) => ({
+      ...plugin,
+      extensions: plugin.extensions.map((ext) => ({ ...ext, pluginId: plugin.id })),
+    }))
+    .flatMap((plugin) => plugin.extensions)
+    .filter((ext) => ext.type === "site.header-action")
+    .filter((ext) => !(ext as HeaderActionExtension & { pluginId: string }).admin || editingEnabled)
+    .filter((ext) => plugins.ready.includes((ext as HeaderActionExtension & { pluginId: string }).pluginId)) as Array<
+      HeaderActionExtension & { pluginId: string }
+    >;
+
+  return (
+    <>
+      {extensions.map((ext, index) => (
+        <ext.render key={index} context={plugins.context(ext.pluginId)} />
+      ))}
+    </>
+  );
+};
 
 export const Header: React.FC<HeaderProps> = () => {
   const list = useList();
@@ -136,11 +167,7 @@ export const Header: React.FC<HeaderProps> = () => {
       )}
 
       <div className="w-full flex flex-wrap justify-center gap-2 max-w-xl mx-auto">
-        <EditReadmeDialog>
-          <IconButton size="3" variant="classic">
-            <InfoCircledIcon width={20} height={20} />
-          </IconButton>
-        </EditReadmeDialog>
+        <HeaderActionExtensions />
         <Link
           rel="noopener noreferrer"
           href={__CONFIGURATION__.repository.url}

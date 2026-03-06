@@ -73,9 +73,9 @@ export const ResourceEditSheet: React.FC<ResourceEditSheetProps> = ({
   };
 
   return (
-    <Sheet.Root open={isOpen && list.canEdit} onOpenChange={setOpen}>
+    <Sheet.Root open={isOpen} onOpenChange={setOpen}>
       {children && (
-        <Sheet.Trigger disabled={!list.canEdit}>{children}</Sheet.Trigger>
+        <Sheet.Trigger>{children}</Sheet.Trigger>
       )}
       <Sheet.Content portal={false} side="right">
         <AutoForm.Root

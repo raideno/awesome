@@ -17,7 +17,6 @@ const AwesomeListBaseSchema = z.looseObject({
   description: z.string().max(192),
   author: z.string().max(64),
   thumbnail: z.string().optional(),
-  readme: z.string().optional(),
   elements: z.array(AwesomeListElementSchema),
   links: z.array(z.url()).max(4).optional(),
 });

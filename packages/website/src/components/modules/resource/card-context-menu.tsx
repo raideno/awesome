@@ -41,11 +41,6 @@ export const ResourceCardContextMenu: React.FC<
   const adminActions = cardContextActions.filter((a) => a.admin);
 
   const handleDeleteButtonClick = async () => {
-    if (!list.canEdit) {
-      toast.error("You do not have permission to delete this resource");
-      return;
-    }
-
     const confirmation = await confirm({
       title: "Delete Resource",
       body: `Are you sure you want to delete the resource "${element.name}"? This action cannot be undone.`,
@@ -114,14 +109,12 @@ export const ResourceCardContextMenu: React.FC<
                 </ContextMenu.Item>
               ))}
               <ContextMenu.Item
-                disabled={!list.canEdit}
                 onClick={() => setOpen(true)}
               >
                 Modify
               </ContextMenu.Item>
               <ContextMenu.Item
                 color="red"
-                disabled={!list.canEdit}
                 onClick={() => handleDeleteButtonClick()}
               >
                 Delete

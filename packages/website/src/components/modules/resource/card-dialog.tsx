@@ -1,6 +1,6 @@
 import "./card-dialog.css";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 import {
   Badge,
@@ -14,15 +14,11 @@ import {
   Text,
 } from "@radix-ui/themes";
 
+import { Portal } from "@radix-ui/react-dialog";
+
 import type { AwesomeListElement } from "shared/types/list";
-import type { PluginDefinition } from "shared/types/plugins";
 
 import { usePlugins } from "@/contexts/plugins";
-
-type CardModalContentExtension = Extract<
-  PluginDefinition["extensions"][number],
-  { type: "card.modal-content" }
->;
 
 export interface ResourceCardDialogProps {
   children?: React.ReactNode;
@@ -35,22 +31,28 @@ export const ResourceCardDialog: React.FC<ResourceCardDialogProps> = ({
   element,
   state,
 }) => {
-  const plugins = usePlugins();
+  const PluginsManager = usePlugins();
   const [internalOpen, setInternalOpen] = useState(false);
+  const [portalContainer, setPortalContainer] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setPortalContainer(document.body);
+  }, []);
 
   const isOpen = state?.open ?? internalOpen;
   const setOpen = state?.onOpenChange ?? setInternalOpen;
 
-  const modalContentPlugin = plugins.plugins
-    .filter((plugin) => plugins.ready.includes(plugin.id))
-    .map((plugin) => ({
-      plugin,
-      extension: plugin.extensions.find(
-        (ext): ext is CardModalContentExtension =>
-          ext.type === "card.modal-content",
-      ),
-    }))
-    .find((entry) => entry.extension !== undefined);
+  const extensions = PluginsManager.plugins
+    .filter((plugin) => PluginsManager.ready.includes(plugin.id))
+    .flatMap((plugin) =>
+      plugin.extensions
+        .filter((extension) => extension.type === "card.modal-content")
+        .map((extension, extensionIndex) => ({
+          extension,
+          pluginId: plugin.id,
+          extensionKey: `${plugin.id}:${extension.type}:${extensionIndex}`,
+        })),
+    );
 
   return (
     <Dialog.Root open={isOpen} onOpenChange={setOpen}>
@@ -62,89 +64,94 @@ export const ResourceCardDialog: React.FC<ResourceCardDialogProps> = ({
         }
       `}
       </style>
-      <Dialog.Content
-        aria-describedby="Detailed view of the resource card, showing description, links, tags, and notes."
-        aria-description="Detailed view of the resource card, showing description, links, tags, and notes."
-        align="start"
-        size="4"
-        className="!p-4 !top-0 !left-0 !right-0 !m-0 !w-screen !h-screen !max-w-none !max-h-none"
-      >
-        <Dialog.Description className="sr-only">
-          Detailed view of the resource card, showing description, links, tags,
-          and notes.
-        </Dialog.Description>
-        <ScrollArea
-          scrollbars="vertical"
-          style={{ height: "100%" }}
+      <Portal container={portalContainer ?? undefined}>
+        <Dialog.Content
+          aria-describedby="Detailed view of the resource card, showing description, links, tags, and notes."
+          aria-description="Detailed view of the resource card, showing description, links, tags, and notes."
+          align="start"
+          size="4"
+          onPointerDownOutside={(event) => event.preventDefault()}
+          onInteractOutside={(event) => event.preventDefault()}
+          onFocusOutside={(event) => event.preventDefault()}
+          className="!p-4 !top-0 !left-0 !right-0 !m-0 !w-screen !h-screen !max-w-none !max-h-none"
         >
-          <Box className="max-w-5xl pt-8 mx-auto">
-            <Flex direction="column" p="0" gap="4">
-              <Box>
-                <Flex direction="row" gap="4" justify="between" align="center">
-                  <Box>
-                    <Dialog.Title size="8" weight="bold" className="!m-0">
-                      {element.name}
-                    </Dialog.Title>
-                  </Box>
-                  <Flex direction="row" gap="2" align="center">
-                    <Dialog.Close>
-                      <Button variant="outline">Close</Button>
-                    </Dialog.Close>
+          <Dialog.Description className="sr-only">
+            Detailed view of the resource card, showing description, links, tags,
+            and notes.
+          </Dialog.Description>
+          <ScrollArea
+            scrollbars="vertical"
+            style={{ height: "100%" }}
+          >
+            <Box className="max-w-5xl pt-8 mx-auto">
+              <Flex direction="column" p="0" gap="4">
+                <Box>
+                  <Flex direction="row" gap="4" justify="between" align="center">
+                    <Box>
+                      <Dialog.Title size="8" weight="bold" className="!m-0">
+                        {element.name}
+                      </Dialog.Title>
+                    </Box>
+                    <Flex direction="row" gap="2" align="center">
+                      <Dialog.Close>
+                        <Button variant="outline">Close</Button>
+                      </Dialog.Close>
+                    </Flex>
                   </Flex>
-                </Flex>
-                {element.description && (
-                  <Text size="4" className="markdown-content leading-relaxed">
-                    {element.description}
-                  </Text>
+                  {element.description && (
+                    <Text size="4" className="markdown-content leading-relaxed">
+                      {element.description}
+                    </Text>
+                  )}
+                </Box>
+
+                {element.link && (
+                  <Flex direction="column" gap="2">
+                    <Heading size="5" weight="medium">
+                      Links
+                    </Heading>
+                    <Link
+                      href={element.link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="!underline"
+                    >
+                      {element.link}
+                    </Link>
+                  </Flex>
                 )}
-              </Box>
 
-              {element.link && (
-                <Flex direction="column" gap="2">
-                  <Heading size="5" weight="medium">
-                    Links
-                  </Heading>
-                  <Link
-                    href={element.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="!underline"
-                  >
-                    {element.link}
-                  </Link>
-                </Flex>
-              )}
-
-              {element.tags.length > 0 && (
-                <Flex direction="column" gap="2">
-                  <Heading size="5" weight="medium">
-                    Tags
-                  </Heading>
-                  <Flex direction="row" wrap="wrap" gap="2">
-                    {element.tags.map((tag) => (
-                      <Badge key={tag} size="2">
-                        {tag}
-                      </Badge>
-                    ))}
+                {element.tags.length > 0 && (
+                  <Flex direction="column" gap="2">
+                    <Heading size="5" weight="medium">
+                      Tags
+                    </Heading>
+                    <Flex direction="row" wrap="wrap" gap="2">
+                      {element.tags.map((tag) => (
+                        <Badge key={tag} size="2">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </Flex>
                   </Flex>
-                </Flex>
-              )}
+                )}
 
-              {modalContentPlugin ? (() => {
-                const PluginContent = modalContentPlugin.extension!.render;
-                return (
-                  <PluginContent
-                    element={element}
-                    context={plugins.context(modalContentPlugin.plugin.id)}
-                  />
-                );
-              })() : (
-                  <div>No Content</div>
-              )}
-            </Flex>
-          </Box>
-        </ScrollArea>
-      </Dialog.Content>
+                {extensions.map(({ extension, pluginId, extensionKey }) => {
+                  const ExtensionComponent = extension.render;
+
+                  return (
+                    <ExtensionComponent
+                      key={extensionKey}
+                      element={element}
+                      context={PluginsManager.context(pluginId)}
+                    />
+                  );
+                })}
+              </Flex>
+            </Box>
+          </ScrollArea>
+        </Dialog.Content>
+      </Portal>
     </Dialog.Root>
   );
 };

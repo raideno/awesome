@@ -12,7 +12,6 @@ import { useLongPress } from "shared/hooks/long-press";
 import type { PluginDefinition } from "shared/types/plugins";
 
 import { useEditing } from "@/contexts/editing";
-import { useList } from "@/contexts/list";
 
 import { OnlyWhenEditingEnabled } from "@/components/layout/only-when-editing-enabled";
 import { ThemeSwitchButton } from "@/components/layout/theme-switch-button";
@@ -23,6 +22,7 @@ import { ResourceCreateSheet } from "@/components/modules/resource/create-sheet"
 import { useNetwork } from "@/contexts/network";
 import { usePlugins, type PluginsContextType } from "@/contexts/plugins";
 import { useModals } from "@/contexts/dialogs";
+import { useRepository } from "@/contexts/repository";
 
 type ActionBarExtension = Extract<
   PluginDefinition["extensions"][number],
@@ -79,16 +79,15 @@ export const FloatingActionBar: React.FC<FloatingActionBarProps> = () => {
   const { setOpen: setEditMetadataOpen } = useModals("metadata-edit-sheet");
 
   const network = useNetwork();
-  const list = useList();
   const plugins = usePlugins();
+  const repository = useRepository();
 
-  const { hasUnsavedChanges, content } = list;
   const { editingEnabled, setEditingEnabled } = useEditing();
 
   const isPushingDisabled: [boolean, string] =
     network.state === "offline"
       ? [true, "No internet available to push changes."]
-      : !hasUnsavedChanges && !plugins.storage.staged.has
+      : Object.keys(repository.changes).length == 0
         ? [true, "No changes detected."]
         : [false, "Push changes."];
 
@@ -138,14 +137,12 @@ export const FloatingActionBar: React.FC<FloatingActionBarProps> = () => {
                   </Tooltip>
                   <IconButton
                     variant="classic"
-                    disabled={!list.canEdit}
                     onClick={() => setCreateSheetOpen(true)}
                   >
                     <PlusIcon />
                   </IconButton>
                   <IconButton
                     variant="classic"
-                    disabled={!list.canEdit}
                     onClick={() => setEditMetadataOpen(true)}
                   >
                     <Pencil1Icon />
@@ -183,7 +180,7 @@ export const FloatingActionBar: React.FC<FloatingActionBarProps> = () => {
       <SettingsDialog />
 
       <OnlyWhenEditingEnabled>
-        <PushChangesDialog yamlContent={content.new} />
+        <PushChangesDialog />
         <ListMetadataEditSheet />
         <ResourceCreateSheet />
       </OnlyWhenEditingEnabled>

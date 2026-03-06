@@ -11,6 +11,7 @@
     "generate-schema": "node --import tsx scripts/gen-schema.ts"
   },
   "dependencies": {
+    "@isomorphic-git/lightning-fs": "^4.6.2",
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-icons": "^1.3.2",
     "@radix-ui/react-toggle-group": "^1.1.10",
@@ -20,7 +21,7 @@
     "@uiw/react-md-editor": "^4.0.8",
     "clsx": "^2.1.1",
     "dotenv-cli": "^9.0.0",
-    "storage-service": "file:../services/storage",
+    "isomorphic-git": "^1.37.2",
     "js-yaml": "^4.1.0",
     "react": "^19.0.0",
     "react-diff-viewer-continued": "^4.1.2",
@@ -29,6 +30,7 @@
     "remark-math": "^6.0.0",
     "shared": "file:../shared",
     "sonner": "^2.0.7",
+    "storage-service": "file:../services/storage",
     "tailwind-merge": "^3.3.1",
     "tsx": "^4.20.3"
   },

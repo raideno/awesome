@@ -25,11 +25,18 @@ declare const __CONFIGURATION__: {
   };
 };
 
-declare module "virtual:plugin-storage" {
+
+
+declare module "virtual:repository" {
+  import type { RepositoryVirtualModule } from "@/contexts/repository";
+
   /**
-   * Build-time snapshot of the storage directory.
-   * Shape: { [pluginId: string]: { [filename: string]: string } }
+   * Build-time repository snapshot.
+   *
+   * - `bundled`: files that were inlined at build time (relativePath → content).
+   * - `baseUrl`: public base URL from which all repository files are served
+   *              at runtime, e.g. "/repository".
    */
-  const storage: Record<string, Record<string, string>>;
-  export default storage;
+  const repository: RepositoryVirtualModule;
+  export default repository;
 }

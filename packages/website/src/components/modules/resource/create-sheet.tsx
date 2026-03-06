@@ -94,9 +94,9 @@ export const ResourceCreateSheet: React.FC<ResourceCreateSheetProps> = ({
   const generatedId = generateUniqueId(existingIds);
 
   return (
-    <Sheet.Root open={isOpen && list.canEdit} onOpenChange={setOpen}>
+    <Sheet.Root open={isOpen} onOpenChange={setOpen}>
       {children && (
-        <Sheet.Trigger disabled={!list.canEdit}>{children}</Sheet.Trigger>
+        <Sheet.Trigger>{children}</Sheet.Trigger>
       )}
       <Sheet.Content portal={false} side="right">
         <AutoForm.Root

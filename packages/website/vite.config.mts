@@ -12,14 +12,17 @@ import yamlAwesomeListPlugin, {
   loadAwesomeList,
 } from "./plugins/yaml-awesome-list";
 import awesomePluginsPlugin from "./plugins/awesome-plugins";
-import pluginStoragePlugin from "./plugins/plugin-storage";
+import repositoryPlugin from "./plugins/repository";
 
 const EnvironmentSchema = z
   .looseObject({
     BASE_PATH: z.string().nonempty(),
     LIST_FILE_PATH: z.string().nonempty(),
     PLUGINS_DIRECTORY_PATH: z.string().optional(),
-    STORAGE_DIRECTORY_PATH: z.string().optional().default("storage"),
+    REPOSITORY_DIRECTORY_PATH: z.string().optional(),
+    REPOSITORY_BUNDLED_FILES: z.string().optional().default(""),
+    REPOSITORY_IGNORE: z.string().optional().default(""),
+    REPOSITORY_PUBLIC_SUBDIR: z.string().optional().default("repository"),
     GITHUB_REPOSITORY_URL: z.string().nonempty(),
     USER_REPOSITORY_COMMIT_HASH: z.string().optional().default(""),
     AWESOME_WEBSITE_TAG: z.string().optional().default("unknown"),
@@ -68,6 +71,14 @@ const EnvironmentSchema = z
     const GITHUB_WORKFLOW_FILE_NAME =
       env.GITHUB_WORKFLOW_REF.match(/\.github\/workflows\/([^@]+)/)?.[1] ?? "";
 
+    const REPOSITORY_BUNDLED_FILES = env.REPOSITORY_BUNDLED_FILES
+      ? env.REPOSITORY_BUNDLED_FILES.split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
+
+    const REPOSITORY_IGNORE = env.REPOSITORY_IGNORE
+      ? env.REPOSITORY_IGNORE.split(",").map((s) => s.trim()).filter(Boolean)
+      : [".git", "node_modules", ".DS_Store"];
+
     return {
       ...env,
       BASE_PATH,
@@ -76,6 +87,9 @@ const EnvironmentSchema = z
       USER_REPOSITORY_COMMIT_HASH,
       AWESOME_WEBSITE_BUILD_TAG,
       GITHUB_WORKFLOW_FILE_NAME,
+      REPOSITORY_BUNDLED_FILES,
+      REPOSITORY_IGNORE,
+      REPOSITORY_PUBLIC_SUBDIR: env.REPOSITORY_PUBLIC_SUBDIR,
     };
   });
 
@@ -88,7 +102,16 @@ export default vite.defineConfig({
     viteReact(),
     yamlAwesomeListPlugin(Environment.LIST_FILE_PATH),
     awesomePluginsPlugin(Environment.PLUGINS_DIRECTORY_PATH),
-    pluginStoragePlugin(Environment.STORAGE_DIRECTORY_PATH),
+    ...(Environment.REPOSITORY_DIRECTORY_PATH
+      ? [
+          repositoryPlugin({
+            path: Environment.REPOSITORY_DIRECTORY_PATH,
+            files: Environment.REPOSITORY_BUNDLED_FILES,
+            ignore: Environment.REPOSITORY_IGNORE,
+            publicSubdir: Environment.REPOSITORY_PUBLIC_SUBDIR,
+          }),
+        ]
+      : []),
     metadataAwesomeList(AWESOME_LIST, Environment.GITHUB_REPOSITORY_URL),
     listFormatsPlugin(AWESOME_LIST),
     VitePWA({
@@ -150,7 +173,7 @@ export default vite.defineConfig({
         path: Environment.LIST_FILE_PATH,
       },
       storage: {
-        path: Environment.STORAGE_DIRECTORY_PATH,
+        path: "storage",
       },
     } satisfies typeof __CONFIGURATION__,
   },

@@ -196,10 +196,6 @@ const GroupContainer: React.FC<{
       <OnlyWhenEditingEnabled>
         <>
           <ResourceCreateSheet
-            state={{
-              open: createSheetOpen,
-              onOpenChange: setCreateSheetOpen,
-            }}
             defaults={
               groupName !== "Ungrouped" ? { group: groupName } : undefined
             }

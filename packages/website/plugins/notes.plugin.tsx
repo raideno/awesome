@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import "@uiw/react-markdown-preview/markdown.css";
 import "@uiw/react-md-editor/markdown-editor.css";
@@ -13,49 +13,10 @@ import remarkMath from "remark-math";
 import { ToggleGroup } from "shared/components/ui/toggle-group";
 import { useTheme } from "shared/contexts/theme";
 import type { AwesomeListElement } from "shared/types/list";
-import type {
-  PluginContext,
-  PluginContextSetup,
-  PluginDefinition,
-} from "shared/types/plugins";
-
-// -----------------------------------------------------------------------------
-// Shared notes state
-//
-// A single in-memory map is allocated for the lifetime of the plugin. All card
-// modals share it, so storage is only read once per element rather than on
-// every open. The adapter exposes get/set over this map so the framework can
-// wire it into React and trigger re-renders when the content changes.
-// -----------------------------------------------------------------------------
-
-const STORAGE_FILENAME = "notes.json";
+import type { PluginContext, PluginDefinition } from "shared/types/plugins";
+import { useQuery } from "@tanstack/react-query";
 
 type ViewMode = "edit" | "live" | "preview";
-type Notes = Record<string, string>;
-
-// Module-level map — survives re-renders, reset only on full page reload.
-const notesCache = new Map<string, Notes>();
-const CACHE_KEY = "all";
-
-const readNotes = async (storage: PluginContext["storage"]): Promise<Notes> => {
-  try {
-    const raw = await storage.read(STORAGE_FILENAME);
-    if (!raw) return {};
-    return JSON.parse(raw) as Notes;
-  } catch {
-    return {};
-  }
-};
-
-const writeNotes = async (
-  storage: PluginContext["storage"],
-  notes: Notes,
-): Promise<void> => {
-  await storage.write(STORAGE_FILENAME, JSON.stringify(notes, null, 2));
-};
-
-// The hook returned by setup.register() — set during createContext.
-let useNotes: (() => [Notes, (notes: Notes) => void]) | null = null;
 
 interface NotesContentProps {
   element: AwesomeListElement;
@@ -66,35 +27,47 @@ const NotesContent: React.FC<NotesContentProps> = ({ element, context }) => {
   const { theme } = useTheme();
 
   const [viewMode, setViewMode] = useState<ViewMode>("live");
-  const [isLoaded, setIsLoaded] = useState(false);
 
-  const [notes, setNotes] = useNotes!();
+  const { data, isLoading } = useQuery({
+    /**
+     * Currently, change of file triggers a complete refresh of the note and retrieve of this, and temproaraly sets back the data to ""
+     * we should do some optimistic thing.
+     */
+    initialData: "",
+    // queryKey: ["notes", element.id, context.repository.files.new[`storage/${context.plugin.id}/notes/${element.id}.md`]] as const,
+    queryKey: ["notes", element.id] as const,
+    queryFn: async (parameter) => {
+      const id = parameter.queryKey[1];
 
-  const currentNote = notes[element.id] ?? "";
+      return (await context.repository.get(
+        `storage/${context.plugin.id}/notes/${id}.md`,
+      )) ?? "";
+    },
+  });
+
+  const [note, setNote] = React.useState(data || "");
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (notesCache.has(CACHE_KEY)) {
-      setIsLoaded(true);
-      return;
-    }
+    setNote(data || "");
+  }, [data, element.id]);
 
-    readNotes(context.storage).then((loaded) => {
-      notesCache.set(CACHE_KEY, loaded);
-      setNotes(loaded);
-      setIsLoaded(true);
-    });
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    };
   }, []);
 
-  const handleChange = async (value: string) => {
-    const updated = { ...notes, [element.id]: value };
-    setNotes(updated);
-    try {
-      await writeNotes(context.storage, updated);
-    } catch (error) {
-      context.toast.error("Failed to save note", {
-        description: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
+  const handleChange = (value: string) => {
+    setNote(value);
+
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    saveTimeoutRef.current = setTimeout(() => {
+      context.repository.write(
+        `storage/${context.plugin.id}/notes/${element.id}.md`,
+        value,
+      );
+    }, 500);
   };
 
   return (
@@ -122,7 +95,7 @@ const NotesContent: React.FC<NotesContentProps> = ({ element, context }) => {
         </ToggleGroup.Root>
       </Flex>
 
-      {!isLoaded ? (
+      {isLoading ? (
         <Text color="gray" size="3">
           Loading notes…
         </Text>
@@ -141,7 +114,7 @@ const NotesContent: React.FC<NotesContentProps> = ({ element, context }) => {
           <MDEditor
             textareaProps={{ placeholder: "Add your notes here…" }}
             hideToolbar
-            value={currentNote}
+            value={note}
             onChange={(value) => handleChange(value ?? "")}
             preview={viewMode}
             height={400}
@@ -162,24 +135,8 @@ export default {
   id: "notes",
   name: "Notes",
   description:
-    "Per-card markdown notes stored in the repository's plugin storage. Replaces the built-in notes editor.",
+    "Per-card markdown notes stored in the repository. Replaces the built-in notes editor.",
   version: "1.0.0",
-  context: {
-    setup: async (context, setup) => {
-      notesCache.set(CACHE_KEY, await readNotes(context.storage));
-      // // Seed the cache from storage eagerly so the first render isn't empty.
-      // readNotes(context.storage).then((loaded) => {
-      //   notesCache.set(CACHE_KEY, loaded);
-      // });
-
-      useNotes = setup.register<Notes>("notes", {
-        get: () => notesCache.get(CACHE_KEY) ?? {},
-        set: (notes) => {
-          notesCache.set(CACHE_KEY, notes);
-        },
-      });
-    },
-  },
   extensions: [
     {
       type: "card.modal-content",

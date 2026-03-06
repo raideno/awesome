@@ -1,0 +1,21 @@
+title: Easy Awesome Website
+description: A curated list of easy awesome website.
+author: Kichou Nadir
+thumbnail: https://upload.wikimedia.org/wikipedia/commons/thumb/b/b6/Image_created_with_a_mobile_phone.png/2560px-Image_created_with_a_mobile_phone.png
+elements:
+  - id: '1'
+    name: Awesome Website
+    description: A tool to generate an awesome website for your awesome lists.
+    link: https://github.com/raideno/awesome
+    tags:
+      - awesome list
+      - awesome website
+  - id: '2'
+    name: Easy Awesome Website
+    description: A tool to easily generate an awesome website for your awesome lists.
+    link: https://github.com/raideno/easy-awesome
+    tags:
+      - awesome list
+      - easy awesome website
+links:
+  - https://github.com/raideno/awesome

@@ -15,6 +15,7 @@ import { MarkersProvider } from "@/contexts/markers";
 import { NetworkProvider } from "@/contexts/network";
 import { PluginsProvider } from "@/contexts/plugins";
 import { ModalsProvider } from "@/contexts/dialogs";
+import { RepositoryProvider } from "@/contexts/repository";
 
 export interface ProvidersProps {
   children: React.ReactNode;
@@ -39,20 +40,22 @@ export const Providers: React.FC<ProvidersProps> = ({ children }) => {
         <QueryClientProvider client={queryClient}>
           <AlertDialogProvider>
             <NetworkProvider>
-              <ModalsProvider>
-                <EditingProvider>
-                  <ListProvider>
-                    <PluginsProvider>
-                      <FilterProvider>
-                        <MarkersProvider>
-                          <Toaster />
-                          <>{children}</>
-                        </MarkersProvider>
-                      </FilterProvider>
-                    </PluginsProvider>
-                  </ListProvider>
-                </EditingProvider>
-              </ModalsProvider>
+              <RepositoryProvider>
+                <ModalsProvider>
+                  <EditingProvider>
+                    <ListProvider>
+                      <PluginsProvider>
+                        <FilterProvider>
+                          <MarkersProvider>
+                            <Toaster />
+                            <>{children}</>
+                          </MarkersProvider>
+                        </FilterProvider>
+                      </PluginsProvider>
+                    </ListProvider>
+                  </EditingProvider>
+                </ModalsProvider>
+              </RepositoryProvider>
             </NetworkProvider>
           </AlertDialogProvider>
         </QueryClientProvider>
