@@ -5,10 +5,6 @@ import { createRequire } from "node:module";
 
 import type { Plugin, ResolvedConfig } from "vite";
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 /**
  * Extracts npm package names from static import / export statements and
  * dynamic import() calls in a source file.
@@ -217,10 +213,6 @@ const ensurePluginDeps = (
   installPackages([...missing], projectRoot, logger);
 };
 
-// ---------------------------------------------------------------------------
-// Plugin scanner
-// ---------------------------------------------------------------------------
-
 /**
  * Scans the plugins directory for plugin files and returns their paths.
  * Full module validation (schema, imports, etc.) is deferred to Vite's
@@ -245,10 +237,6 @@ export const loadPlugins = (
   );
 };
 
-// ---------------------------------------------------------------------------
-// Vite plugin
-// ---------------------------------------------------------------------------
-
 export default (pluginsDirectoryPath?: string): Plugin => {
   const virtualModuleId = "virtual:plugins";
   const resolvedVirtualModuleId = "\0" + virtualModuleId;
@@ -271,11 +259,6 @@ export default (pluginsDirectoryPath?: string): Plugin => {
       }
     },
 
-    // -------------------------------------------------------------------------
-    // buildStart — runs for both `vite build` and `vite dev`.
-    // This is the earliest hook where we can safely run side-effects that must
-    // complete before module resolution begins.
-    // -------------------------------------------------------------------------
     buildStart() {
       if (!pluginsDirectoryPath) return;
 

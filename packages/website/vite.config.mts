@@ -15,16 +15,24 @@ import type { AwesomeList } from "../shared/src/types/list";
 
 const EnvironmentSchema = z
   .looseObject({
-    BASE_PATH: z.string().nonempty(),
-    GITHUB_REPOSITORY_URL: z.string().nonempty(),
-    GITHUB_WORKFLOW_REF: z.string().nonempty(),
+    BASE: z.string().nonempty(),
+
     LIST_FILE_PATH: z.string().nonempty().optional().default("list.yaml"),
+
+    // TODO: make it depend on the repository loaded files for simplicity
     PLUGINS_DIRECTORY_PATH: z.string().nonempty().optional().default("plugins"),
-    STORAGE_DIRECTORY_PATH: z.string().nonempty().optional().default("storage"),
+
     REPOSITORY_DIRECTORY_PATH: z.string(),
     REPOSITORY_BUNDLED_FILES: z.string().optional().default(""),
     REPOSITORY_IGNORE: z.string().optional().default(""),
     REPOSITORY_PUBLIC_SUBDIR: z.string().optional().default("repository"),
+    /**
+     * TODO: add storage path to be bundled, add plugins path to not be bundled.
+     */
+
+    GITHUB_REPOSITORY_URL: z.string().nonempty(),
+    GITHUB_WORKFLOW_REF: z.string().nonempty(),
+
     USER_REPOSITORY_COMMIT_HASH: z.string().optional().default(""),
     AWESOME_WEBSITE_TAG: z.string().optional().default("unknown"),
   })
@@ -32,7 +40,7 @@ const EnvironmentSchema = z
     const [GITHUB_REPOSITORY_OWNER, GITHUB_REPOSITORY_NAME] =
       env.GITHUB_REPOSITORY_URL.split("/").slice(-2);
 
-    const BASE_PATH = env.BASE_PATH || `/${GITHUB_REPOSITORY_NAME}`;
+    const BASE = env.BASE || `/${GITHUB_REPOSITORY_NAME}`;
 
     const USER_REPOSITORY_COMMIT_HASH =
       env.USER_REPOSITORY_COMMIT_HASH ||
@@ -81,7 +89,7 @@ const EnvironmentSchema = z
 
     return {
       ...env,
-      BASE_PATH,
+      BASE,
       GITHUB_REPOSITORY_OWNER,
       GITHUB_REPOSITORY_NAME,
       USER_REPOSITORY_COMMIT_HASH,
@@ -104,10 +112,7 @@ const loaded = repository.load({
   ignore: Environment.REPOSITORY_IGNORE,
   publicSubdir: Environment.REPOSITORY_PUBLIC_SUBDIR,
   validators: {
-    [Environment.LIST_FILE_PATH]: (raw: string): AwesomeList => {
-      const parsed = yaml.load(raw);
-      return AwesomeListSchema.parse(parsed);
-    },
+    [Environment.LIST_FILE_PATH]: (raw: string): AwesomeList => AwesomeListSchema.parse(yaml.load(raw))
   },
 });
 
@@ -204,7 +209,7 @@ export default vite.defineConfig({
       "@raideno/auto-form/ui",
     ],
   },
-  base: Environment.BASE_PATH,
+  base: Environment.BASE,
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
