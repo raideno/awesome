@@ -25,10 +25,6 @@ import { useRepository } from "@/contexts/repository";
 import { useGitHubAuth } from "@/hooks/github-auth";
 import { useModals } from "@/contexts/dialogs";
 
-// ---------------------------------------------------------------------------
-// Form schema
-// ---------------------------------------------------------------------------
-
 const PushChangesFormSchema = z.object({
   repository: z
     .string()
@@ -39,10 +35,6 @@ const PushChangesFormSchema = z.object({
     .max(48)
     .register(MetadataRegistry, { label: "Commit Message*", disabled: false }),
 });
-
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
 
 interface PushChangesDialogProps {
   children?: React.ReactNode;

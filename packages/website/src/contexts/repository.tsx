@@ -242,6 +242,7 @@ export const RepositoryProvider: React.FC<{ children: React.ReactNode }> = ({
         return;
       }
 
+      // TODO: we should pack all changes in a single commit
       for (const { path, new: content } of Object.values(diffs)) {
         await github.write(path, content, message);
       }
