@@ -17,9 +17,6 @@
     "thumbnail": {
       "type": "string"
     },
-    "readme": {
-      "type": "string"
-    },
     "elements": {
       "type": "array",
       "items": {
@@ -37,9 +34,6 @@
           "description": {
             "type": "string",
             "maxLength": 192
-          },
-          "notes": {
-            "type": "string"
           },
           "link": {
             "type": "string",
@@ -63,7 +57,7 @@
           "description",
           "tags"
         ],
-        "additionalProperties": false
+        "additionalProperties": {}
       }
     },
     "links": {
@@ -81,5 +75,5 @@
     "author",
     "elements"
   ],
-  "additionalProperties": false
+  "additionalProperties": {}
 }
