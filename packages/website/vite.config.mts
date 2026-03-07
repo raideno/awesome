@@ -19,16 +19,12 @@ const EnvironmentSchema = z
 
     LIST_FILE_PATH: z.string().nonempty().optional().default("list.yaml"),
 
-    // TODO: make it depend on the repository loaded files for simplicity
-    PLUGINS_DIRECTORY_PATH: z.string().nonempty().optional().default("plugins"),
+    PLUGINS_DIRECTORY_PATH: z.string().nonempty().optional(),
 
     REPOSITORY_DIRECTORY_PATH: z.string(),
     REPOSITORY_BUNDLED_FILES: z.string().optional().default(""),
     REPOSITORY_IGNORE: z.string().optional().default(""),
     REPOSITORY_PUBLIC_SUBDIR: z.string().optional().default("repository"),
-    /**
-     * TODO: add storage path to be bundled, add plugins path to not be bundled.
-     */
 
     GITHUB_REPOSITORY_URL: z.string().nonempty(),
     GITHUB_WORKFLOW_REF: z.string().nonempty(),
@@ -87,6 +83,10 @@ const EnvironmentSchema = z
       ? env.REPOSITORY_IGNORE.split(",").map((s) => s.trim()).filter(Boolean)
       : [".git", "node_modules", ".DS_Store"];
 
+    const PLUGINS_DIRECTORY_PATH = env.PLUGINS_DIRECTORY_PATH
+      ? path.resolve(env.REPOSITORY_DIRECTORY_PATH, env.PLUGINS_DIRECTORY_PATH)
+      : path.resolve(env.REPOSITORY_DIRECTORY_PATH, "plugins");
+
     return {
       ...env,
       BASE,
@@ -98,6 +98,7 @@ const EnvironmentSchema = z
       REPOSITORY_BUNDLED_FILES,
       REPOSITORY_IGNORE,
       REPOSITORY_PUBLIC_SUBDIR: env.REPOSITORY_PUBLIC_SUBDIR,
+      PLUGINS_DIRECTORY_PATH,
     };
   });
 

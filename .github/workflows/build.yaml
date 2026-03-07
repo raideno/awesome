@@ -18,7 +18,7 @@ jobs:
       - name: setup node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: install dependencies
         run: npm ci
@@ -48,12 +48,9 @@ jobs:
       - name: build
         env:
           BASE: /
-          LIST_FILE_PATH: ./example.list.yaml
-          PLUGINS_DIRECTORY_PATH: plugins
+          LIST_FILE_PATH: example/list.yaml
+          PLUGINS_DIRECTORY_PATH: example/plugins
           REPOSITORY_DIRECTORY_PATH: ${{ github.workspace }}
-          REPOSITORY_BUNDLED_FILES: README.md,example.list.yaml
-          REPOSITORY_IGNORE: ""
-          REPOSITORY_PUBLIC_SUBDIR: repository
           GITHUB_REPOSITORY_URL: https://github.com/raideno/awesome
           GITHUB_WORKFLOW_REF: ${{ github.workflow_ref }}
           USER_REPOSITORY_COMMIT_HASH: ${{ steps.user-commit.outputs.hash }}

@@ -4,8 +4,6 @@ branding:
   icon: book-open
   color: orange
 inputs:
-  # TODO: remove options that are not needed
-  # remove repository options, make a default one and plugins-directory-path
   yaml-path:
     description: "Path to the YAML file to use as data source."
     required: true
@@ -15,18 +13,6 @@ inputs:
   base:
     description: "Optional base path (e.g. /my-site/) to host under. Default is the repository name to support GitHub Pages."
     required: false
-  repository-bundled-files:
-    description: "Optional comma-separated list of files to bundle from the repository (relative paths). E.g. 'README.md,list.yaml'."
-    required: false
-    default: ""
-  repository-ignore:
-    description: "Optional comma-separated list of paths to ignore when copying the repository. Defaults to '.git,node_modules,.DS_Store'."
-    required: false
-    default: ""
-  repository-public-subdir:
-    description: "Optional subdirectory name under the public folder where repository files are served. Default is 'repository'."
-    required: false
-    default: "repository"
 runs:
   using: "composite"
   steps:
@@ -51,7 +37,7 @@ runs:
     - name: setup node.js
       uses: actions/setup-node@v4
       with:
-        node-version: "20"
+        node-version: "24"
 
     - name: install dependencies
       run: |
@@ -116,9 +102,6 @@ runs:
         LIST_FILE_PATH: ${{ inputs.yaml-path }}
         PLUGINS_DIRECTORY_PATH: ${{ inputs.plugins-directory-path }}
         REPOSITORY_DIRECTORY_PATH: ${{ github.workspace }}
-        REPOSITORY_BUNDLED_FILES: ${{ inputs.repository-bundled-files }}
-        REPOSITORY_IGNORE: ${{ inputs.repository-ignore }}
-        REPOSITORY_PUBLIC_SUBDIR: ${{ inputs.repository-public-subdir }}
         GITHUB_REPOSITORY_URL: https://github.com/${{ github.repository }}
         GITHUB_WORKFLOW_REF: ${{ github.workflow_ref }}
         USER_REPOSITORY_COMMIT_HASH: ${{ steps.user-commit.outputs.hash }}
