@@ -48,11 +48,15 @@ jobs:
       - name: build
         env:
           BASE: /
-          LIST_FILE_PATH: example/list.yaml
-          PLUGINS_DIRECTORY_PATH: example/plugins
-          REPOSITORY_DIRECTORY_PATH: ${{ github.workspace }}
+          LIST_FILE_PATH: list.yaml
+          PLUGINS_DIRECTORY_PATH: plugins
+          REPOSITORY_DIRECTORY_PATH: ${{ github.workspace }}/example
           GITHUB_REPOSITORY_URL: https://github.com/raideno/awesome
           GITHUB_WORKFLOW_REF: ${{ github.workflow_ref }}
           USER_REPOSITORY_COMMIT_HASH: ${{ steps.user-commit.outputs.hash }}
           AWESOME_WEBSITE_TAG: ${{ steps.awesome-tag.outputs.tag }}
         run: npm run build
+
+      - name: typecheck
+        working-directory: packages/website
+        run: npm run typecheck

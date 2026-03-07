@@ -3,8 +3,8 @@
   "private": false,
   "workspaces": [
     "packages/shared",
-    "packages/website",
-    "packages/services/storage"
+    "packages/services/storage",
+    "packages/website"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",

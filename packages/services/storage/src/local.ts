@@ -101,7 +101,7 @@ export class LocalRepositoryService extends BaseRepositoryService {
     this.putStored(path, content);
   }
 
-  versions(size: number): Promise<TagInfo[]> {
+  versions(_: number): Promise<TagInfo[]> {
     return [] as unknown as Promise<Array<TagInfo>>;
   }
 

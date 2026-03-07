@@ -2,11 +2,11 @@ import child from "node:child_process";
 import path from "node:path";
 
 import * as z from "zod/v4";
-import * as yaml from "js-yaml";
 import * as vite from "vite";
+import * as yaml from "js-yaml";
+import { VitePWA } from "vite-plugin-pwa";
 
 import viteReact from "@vitejs/plugin-react";
-import { VitePWA } from "vite-plugin-pwa";
 import awesomePluginsPlugin from "./plugins/awesome-plugins";
 import repository from "./plugins/repository";
 
@@ -117,7 +117,7 @@ const loaded = repository.load({
   },
 });
 
-const list = loaded.validated[Environment.LIST_FILE_PATH] as AwesomeList;
+const list = loaded.files[Environment.LIST_FILE_PATH] as unknown as AwesomeList;
 
 export default vite.defineConfig({
   plugins: [

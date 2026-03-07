@@ -142,18 +142,32 @@ function* walk(
   dir: string,
   baseDir: string,
   ignoreSet: Set<string>,
+  absIgnoreDirs: Set<string> = new Set(),
 ): Generator<string> {
   if (!fs.existsSync(dir)) return;
 
   const entries = fs.readdirSync(dir, { withFileTypes: true });
 
   for (const entry of entries) {
-    const relativePath = path.relative(baseDir, path.join(dir, entry.name));
+    const absEntry = path.join(dir, entry.name);
+    const relativePath = path.relative(baseDir, absEntry);
 
     if (shouldIgnore(relativePath, ignoreSet)) continue;
 
+    // Skip any directory (or file) whose absolute path is — or is nested
+    // inside — one of the explicitly excluded absolute paths.  This prevents
+    // the public/repository destination from being recursively copied into
+    // itself when it lives inside the source repository tree.
+    if (
+      [...absIgnoreDirs].some(
+        (ignored) =>
+          absEntry === ignored || absEntry.startsWith(ignored + path.sep),
+      )
+    )
+      continue;
+
     if (entry.isDirectory()) {
-      yield* walk(path.join(dir, entry.name), baseDir, ignoreSet);
+      yield* walk(absEntry, baseDir, ignoreSet, absIgnoreDirs);
     } else if (entry.isFile()) {
       yield relativePath;
     }
@@ -265,9 +279,14 @@ const copyRepositoryToPublic = (
     return;
   }
 
+  // Exclude the destination directory itself so that a public/repository
+  // folder nested inside the source tree is never walked and copied into
+  // itself (which would produce infinitely deep paths).
+  const absIgnoreDirs = new Set<string>([path.resolve(destDir)]);
+
   let count = 0;
 
-  for (const relativePath of walk(sourceDir, sourceDir, ignoreSet)) {
+  for (const relativePath of walk(sourceDir, sourceDir, ignoreSet, absIgnoreDirs)) {
     const srcFile = path.join(sourceDir, relativePath);
     const destFile = path.join(destDir, relativePath);
 

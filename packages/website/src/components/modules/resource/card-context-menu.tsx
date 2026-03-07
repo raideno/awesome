@@ -4,7 +4,6 @@ import { ContextMenu } from "@radix-ui/themes";
 import { toast } from "sonner";
 
 import type { AwesomeListElement } from "shared/types/list";
-import type { PluginDefinition } from "shared/types/plugins";
 
 import { useList } from "@/contexts/list";
 import { usePlugins } from "@/contexts/plugins";
@@ -13,11 +12,6 @@ import { OnlyWhenEditingEnabled } from "@/components/layout/only-when-editing-en
 import { ResourceEditSheet } from "@/components/modules/resource/edit-sheet";
 import { AdminOnly } from "@/components/utils/admin-only";
 import { useConfirm } from "@/components/utils/alert-dialog";
-
-type CardContextAction = Extract<
-  PluginDefinition["extensions"][number],
-  { type: "card.context-action" }
->;
 
 export interface ResourceCardContextMenuProps {
   children?: React.ReactNode;

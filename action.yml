@@ -5,13 +5,16 @@ branding:
   color: orange
 inputs:
   yaml-path:
-    description: "Path to the YAML file to use as data source."
+    description: "Path to the YAML file to use as data source, relative to repository-directory-path (or the workspace root if not set)."
     required: true
   plugins-directory-path:
-    description: "Optional path to a directory containing custom plugins. Default is 'plugins' in the repository root."
+    description: "Optional path to a directory containing custom plugins, relative to repository-directory-path (or the workspace root if not set). Default is 'plugins'."
     required: false
   base:
     description: "Optional base path (e.g. /my-site/) to host under. Default is the repository name to support GitHub Pages."
+    required: false
+  repository-directory-path:
+    description: "Optional path (relative to the workspace root) to the sub-directory that should be treated as the repository root. When set, yaml-path and plugins-directory-path are resolved relative to this sub-directory. Defaults to the workspace root."
     required: false
 runs:
   using: "composite"
@@ -45,12 +48,26 @@ runs:
         npm ci
       shell: bash
 
+    - name: determine repository directory
+      id: repo-dir
+      run: |
+        if [ -n "${{ inputs.repository-directory-path }}" ]; then
+          echo "value=${{ github.workspace }}/${{ inputs.repository-directory-path }}" >> "$GITHUB_OUTPUT"
+        else
+          echo "value=${{ github.workspace }}" >> "$GITHUB_OUTPUT"
+        fi
+      shell: bash
+
     - name: copy user YAML file
       run: |
-        cp ${{ github.workspace }}/${{ inputs.yaml-path }} awesome-src/packages/website/${{ inputs.yaml-path }}
-        YAML_DIR=$(dirname "${{ github.workspace }}/${{ inputs.yaml-path }}")
+        REPO_DIR="${{ steps.repo-dir.outputs.value }}"
+        SRC_YAML="$REPO_DIR/${{ inputs.yaml-path }}"
+        DEST_YAML="awesome-src/packages/website/${{ inputs.yaml-path }}"
+        mkdir -p "$(dirname "$DEST_YAML")"
+        cp "$SRC_YAML" "$DEST_YAML"
+        YAML_DIR="$(dirname "$SRC_YAML")"
         if [ -f "$YAML_DIR/README.md" ]; then
-          cp "$YAML_DIR/README.md" awesome-src/packages/website/$(dirname "${{ inputs.yaml-path }}")/README.md
+          cp "$YAML_DIR/README.md" "awesome-src/packages/website/$(dirname "${{ inputs.yaml-path }}")/README.md"
           echo "[awesome]: README.md copied."
         else
           echo "[awesome]: No README.md found, skipping."
@@ -101,7 +118,7 @@ runs:
         BASE: ${{ steps.base.outputs.value }}
         LIST_FILE_PATH: ${{ inputs.yaml-path }}
         PLUGINS_DIRECTORY_PATH: ${{ inputs.plugins-directory-path }}
-        REPOSITORY_DIRECTORY_PATH: ${{ github.workspace }}
+        REPOSITORY_DIRECTORY_PATH: ${{ steps.repo-dir.outputs.value }}
         GITHUB_REPOSITORY_URL: https://github.com/${{ github.repository }}
         GITHUB_WORKFLOW_REF: ${{ github.workflow_ref }}
         USER_REPOSITORY_COMMIT_HASH: ${{ steps.user-commit.outputs.hash }}
