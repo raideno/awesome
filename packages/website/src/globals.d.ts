@@ -17,7 +17,6 @@ declare const __CONFIGURATION__: {
   };
   awesome: true;
   list: {
-    content: any;
     path: string;
   };
   storage: {

@@ -36,6 +36,7 @@ import { ResourceCard } from "@/components/modules/resource/card";
 import { ResourceCardContextMenu } from "@/components/modules/resource/card-context-menu";
 import { ResourceCreateSheet } from "@/components/modules/resource/create-sheet";
 import { AdminOnly } from "@/components/utils/admin-only";
+import { useModals } from "@/contexts/dialogs";
 
 export interface GroupedResourceGridProps {
   filteredElements: Array<AwesomeListElement>;
@@ -50,7 +51,7 @@ const GroupContainer: React.FC<{
   elements: Array<AwesomeListElement>;
   color: string;
 }> = ({ groupName, elements, color }) => {
-  const [createSheetOpen, setCreateSheetOpen] = React.useState(false);
+  const { setOpen: setCreateSheetOpen } = useModals("element.create.sheet");
   const [renameDialogOpen, setRenameDialogOpen] = React.useState(false);
   const { editingEnabled } = useEditing();
   const list = useList();

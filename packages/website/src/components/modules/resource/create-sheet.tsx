@@ -1,4 +1,4 @@
-import { useState, type ComponentProps } from "react";
+import { type ComponentProps } from "react";
 
 import { Heading, ScrollArea, Text } from "@radix-ui/themes";
 import { MetadataRegistry } from "@raideno/auto-form/registry";

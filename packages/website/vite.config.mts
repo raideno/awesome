@@ -2,31 +2,31 @@ import child from "node:child_process";
 import path from "node:path";
 
 import * as z from "zod/v4";
+import * as yaml from "js-yaml";
 import * as vite from "vite";
 
 import viteReact from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
-import listFormatsPlugin from "./plugins/list-formats";
-import metadataAwesomeList from "./plugins/metadata-awesome-list";
-import yamlAwesomeListPlugin, {
-  loadAwesomeList,
-} from "./plugins/yaml-awesome-list";
 import awesomePluginsPlugin from "./plugins/awesome-plugins";
-import repositoryPlugin from "./plugins/repository";
+import repository from "./plugins/repository";
+
+import { AwesomeListSchema } from "../shared/src/types/list";
+import type { AwesomeList } from "../shared/src/types/list";
 
 const EnvironmentSchema = z
   .looseObject({
     BASE_PATH: z.string().nonempty(),
-    LIST_FILE_PATH: z.string().nonempty(),
-    PLUGINS_DIRECTORY_PATH: z.string().optional(),
-    REPOSITORY_DIRECTORY_PATH: z.string().optional(),
+    GITHUB_REPOSITORY_URL: z.string().nonempty(),
+    GITHUB_WORKFLOW_REF: z.string().nonempty(),
+    LIST_FILE_PATH: z.string().nonempty().optional().default("list.yaml"),
+    PLUGINS_DIRECTORY_PATH: z.string().nonempty().optional().default("plugins"),
+    STORAGE_DIRECTORY_PATH: z.string().nonempty().optional().default("storage"),
+    REPOSITORY_DIRECTORY_PATH: z.string(),
     REPOSITORY_BUNDLED_FILES: z.string().optional().default(""),
     REPOSITORY_IGNORE: z.string().optional().default(""),
     REPOSITORY_PUBLIC_SUBDIR: z.string().optional().default("repository"),
-    GITHUB_REPOSITORY_URL: z.string().nonempty(),
     USER_REPOSITORY_COMMIT_HASH: z.string().optional().default(""),
     AWESOME_WEBSITE_TAG: z.string().optional().default("unknown"),
-    GITHUB_WORKFLOW_REF: z.string().nonempty(),
   })
   .transform((env) => {
     const [GITHUB_REPOSITORY_OWNER, GITHUB_REPOSITORY_NAME] =
@@ -95,34 +95,38 @@ const EnvironmentSchema = z
 
 const Environment = EnvironmentSchema.parse(process.env);
 
-const AWESOME_LIST = loadAwesomeList(Environment.LIST_FILE_PATH);
+const loaded = repository.load({
+  path: Environment.REPOSITORY_DIRECTORY_PATH,
+  files: [
+    Environment.LIST_FILE_PATH,
+    ...Environment.REPOSITORY_BUNDLED_FILES,
+  ],
+  ignore: Environment.REPOSITORY_IGNORE,
+  publicSubdir: Environment.REPOSITORY_PUBLIC_SUBDIR,
+  validators: {
+    [Environment.LIST_FILE_PATH]: (raw: string): AwesomeList => {
+      const parsed = yaml.load(raw);
+      return AwesomeListSchema.parse(parsed);
+    },
+  },
+});
+
+const list = loaded.validated[Environment.LIST_FILE_PATH] as AwesomeList;
 
 export default vite.defineConfig({
   plugins: [
     viteReact(),
-    yamlAwesomeListPlugin(Environment.LIST_FILE_PATH),
     awesomePluginsPlugin(Environment.PLUGINS_DIRECTORY_PATH),
-    ...(Environment.REPOSITORY_DIRECTORY_PATH
-      ? [
-          repositoryPlugin({
-            path: Environment.REPOSITORY_DIRECTORY_PATH,
-            files: Environment.REPOSITORY_BUNDLED_FILES,
-            ignore: Environment.REPOSITORY_IGNORE,
-            publicSubdir: Environment.REPOSITORY_PUBLIC_SUBDIR,
-          }),
-        ]
-      : []),
-    metadataAwesomeList(AWESOME_LIST, Environment.GITHUB_REPOSITORY_URL),
-    listFormatsPlugin(AWESOME_LIST),
+    repository.plugin(loaded),
     VitePWA({
       registerType: "autoUpdate",
       workbox: {
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MB
       },
       manifest: {
-        name: AWESOME_LIST.title,
-        short_name: AWESOME_LIST.title,
-        description: AWESOME_LIST.description,
+        name: list.title,
+        short_name: list.title,
+        description: list.description,
         theme_color: "#ffffff",
         background_color: "#ffffff",
         display: "standalone",
@@ -169,7 +173,6 @@ export default vite.defineConfig({
       },
       awesome: true,
       list: {
-        content: AWESOME_LIST,
         path: Environment.LIST_FILE_PATH,
       },
       storage: {

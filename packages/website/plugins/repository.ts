@@ -10,22 +10,22 @@ export interface RepositoryVirtualModule {
   baseUrl: string;
 }
 
-export interface RepositoryPluginOptions {
+export interface RepositoryLoadOptions {
   /**
-   * Absolute or relative path to the source repository directory whose
-   * contents should be made available at runtime.
+   * Absolute or relative (to cwd) path to the source repository directory
+   * whose contents should be made available at runtime.
    */
   path: string;
 
   /**
-   * Glob patterns (relative to `repositoryPath`) for files that are bundled
-   * directly into the JS module at build time and resolved synchronously from
-   * the virtual module.  Every other file is only copied to
-   * `public/repository` and must be fetched at runtime.
+   * Glob patterns (relative to `path`) for files that are bundled directly
+   * into the JS module at build time and resolved synchronously from the
+   * virtual module. Every other file is only copied to `public/repository`
+   * and must be fetched at runtime.
    *
    * Both plain file names and glob patterns are supported.
    *
-   * @example ["README.md", "awesome.yaml", "storage/*", "data/**\/*.json"]
+   * @example ["README.md", "list.yaml", "storage/*", "data/**\/*.json"]
    */
   files?: Array<string>;
 
@@ -43,12 +43,94 @@ export interface RepositoryPluginOptions {
    * Name of the sub-folder created inside `public/` that will hold the copied
    * repository files.  Defaults to `"repository"`.
    *
-   * Override this to a git-ignored name (e.g. `".repository"`) so the copied
-   * files are never accidentally committed to your repository.
+   * @default "repository"
+   */
+  publicSubdir?: string;
+
+  /**
+   * Optional map of relative file paths to validation functions.
+   *
+   * Each key is a relative file path (e.g. `"list.yaml"`) and each value is
+   * a function that receives the raw string content of that file and either
+   * returns a validated/transformed value or throws an error if validation
+   * fails.  The returned value is stored in `LoadedRepository.validated` under
+   * the same key.
+   *
+   * Validation runs eagerly inside `repository.load()`, before
+   * `vite.defineConfig` is evaluated, so any validation error will abort the
+   * build with a clear message.
+   *
+   * @example
+   * ```ts
+   * validators: {
+   *   "list.yaml": (raw) => {
+   *     const data = yaml.load(raw);
+   *     return AwesomeListSchema.parse(data);
+   *   },
+   * }
+   * ```
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  validators?: Record<string, (raw: string) => any>;
+}
+
+export interface RepositoryPluginOptions {
+  /**
+   * Absolute or relative path to the source repository directory whose
+   * contents should be made available at runtime.
+   */
+  path: string;
+
+  /**
+   * Glob patterns (relative to `path`) for files that are bundled
+   * directly into the JS module at build time.
+   */
+  files?: Array<string>;
+
+  /**
+   * Patterns **or** sub-directory names to exclude from both bundling and the
+   * public copy.
+   */
+  ignore?: Array<string>;
+
+  /**
+   * Name of the sub-folder created inside `public/` that will hold the copied
+   * repository files.  Defaults to `"repository"`.
    *
    * @default "repository"
    */
   publicSubdir?: string;
+}
+
+/**
+ * The object returned by `repository.load()`.
+ *
+ * - `files`     — raw string contents of every matched bundled file.
+ * - `validated` — results of every validator function, keyed by file path.
+ * - Pass the whole object to `repository.plugin()`.
+ */
+export interface LoadedRepository {
+  /** Raw file contents keyed by relative path (e.g. `"list.yaml"`). */
+  files: Record<string, string>;
+
+  /**
+   * Validated / transformed values keyed by relative path.
+   * Only populated for files that had a matching entry in `validators`.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  validated: Record<string, any>;
+
+  /** Resolved absolute path to the repository directory. */
+  repositoryPath: string;
+
+  /** Resolved bundled file patterns. */
+  bundledFiles: Array<string>;
+
+  /** Ignore list as supplied. */
+  ignore: Array<string>;
+
+  /** Public sub-directory name. */
+  publicSubdir: string;
 }
 
 /**
@@ -78,7 +160,10 @@ function* walk(
   }
 }
 
-const shouldIgnore = (relativePath: string, ignoreSet: Set<string>): boolean => {
+const shouldIgnore = (
+  relativePath: string,
+  ignoreSet: Set<string>,
+): boolean => {
   if (ignoreSet.has(relativePath)) return true;
 
   const parts = relativePath.split(path.sep);
@@ -108,12 +193,14 @@ const resolveBundledPatterns = (
     // Normalise to forward slashes — globSync always uses them.
     const normPattern = pattern.split(path.sep).join("/");
 
-    const matches = fs.globSync(normPattern, {
-      cwd: sourceDir,
-    }).filter((match) => {
-      const abs = path.join(sourceDir, match);
-      return fs.statSync(abs).isFile();
-    });
+    const matches = fs
+      .globSync(normPattern, {
+        cwd: sourceDir,
+      })
+      .filter((match) => {
+        const abs = path.join(sourceDir, match);
+        return fs.statSync(abs).isFile();
+      });
 
     for (const match of matches) {
       // Normalise back to the OS separator for consistent map keys.
@@ -144,12 +231,14 @@ const matchesBundledPattern = (
   for (const pattern of patterns) {
     const normPattern = pattern.split(path.sep).join("/");
 
-    const matches = fs.globSync(normPattern, {
-      cwd: sourceDir,
-    }).filter((match) => {
-      const abs = path.join(sourceDir, match);
-      return fs.existsSync(abs) && fs.statSync(abs).isFile();
-    });
+    const matches = fs
+      .globSync(normPattern, {
+        cwd: sourceDir,
+      })
+      .filter((match) => {
+        const abs = path.join(sourceDir, match);
+        return fs.existsSync(abs) && fs.statSync(abs).isFile();
+      });
 
     if (matches.some((m) => m.split(path.sep).join("/") === normRelative)) {
       return true;
@@ -202,7 +291,11 @@ const readBundledFiles = (
 ): Record<string, string> => {
   const result: Record<string, string> = {};
 
-  const resolvedPaths = resolveBundledPatterns(sourceDir, bundledFiles, ignoreSet);
+  const resolvedPaths = resolveBundledPatterns(
+    sourceDir,
+    bundledFiles,
+    ignoreSet,
+  );
 
   for (const relativePath of resolvedPaths) {
     const absPath = path.join(sourceDir, relativePath);
@@ -215,31 +308,70 @@ const readBundledFiles = (
   return result;
 };
 
-export const loadRepository = (
-  repositoryPath: string | undefined,
-  bundledFiles: Array<string> = [],
-  ignore: Array<string> = [],
-): Record<string, string> => {
-  if (!repositoryPath || !fs.existsSync(repositoryPath)) return {};
-
-  const ignoreSet = new Set(ignore);
-
-  return readBundledFiles(repositoryPath, bundledFiles, ignoreSet);
-};
-
-export default (options: RepositoryPluginOptions): Plugin => {
+const load = (options: RepositoryLoadOptions): LoadedRepository => {
   const {
     path: repositoryPath,
     files: bundledFiles = [],
     ignore = [],
     publicSubdir = "repository",
+    validators = {},
   } = options;
+
+  const absRepositoryPath = path.resolve(process.cwd(), repositoryPath);
+  const ignoreSet = new Set(ignore);
+
+  // Read all bundled files from disk eagerly.
+  const files =
+    fs.existsSync(absRepositoryPath)
+      ? readBundledFiles(absRepositoryPath, bundledFiles, ignoreSet)
+      : {};
+
+  // Run validators.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const validated: Record<string, any> = {};
+
+  for (const [relativePath, validate] of Object.entries(validators)) {
+    const raw = files[relativePath];
+
+    if (raw === undefined) {
+      throw new Error(
+        `[repository](validate): file "${relativePath}" was listed in validators but was not found among the bundled files.\n` +
+          `  Make sure "${relativePath}" is included in the "files" patterns.`,
+      );
+    }
+
+    try {
+      validated[relativePath] = validate(raw);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `[repository](validate): validation failed for "${relativePath}":\n  ${message}`,
+        { cause: error },
+      );
+    }
+  }
+
+  return {
+    files,
+    validated,
+    repositoryPath: absRepositoryPath,
+    bundledFiles,
+    ignore,
+    publicSubdir,
+  };
+};
+
+const plugin = (loaded: LoadedRepository): Plugin => {
+  const {
+    repositoryPath,
+    bundledFiles,
+    ignore,
+    publicSubdir: PUBLIC_SUBDIR,
+  } = loaded;
 
   const virtualModuleId = "virtual:repository";
   const resolvedVirtualModuleId = "\0" + virtualModuleId;
-
-  /** Sub-folder inside `public/` where repository files are served from. */
-  const PUBLIC_SUBDIR = publicSubdir;
 
   const ignoreSet = new Set(ignore);
 
@@ -256,7 +388,10 @@ export default (options: RepositoryPluginOptions): Plugin => {
     configResolved(config) {
       resolvedConfig = config;
 
-      absRepositoryPath = path.resolve(config.root, repositoryPath);
+      // repositoryPath is already absolute — it was resolved against cwd() in
+      // load().  We just assign it directly instead of re-resolving against
+      // config.root (which would corrupt the path if it were already absolute).
+      absRepositoryPath = repositoryPath;
       absPublicDestDir = path.resolve(config.publicDir, PUBLIC_SUBDIR);
 
       config.logger.info(`[repository](source): ${absRepositoryPath}`);
@@ -270,29 +405,31 @@ export default (options: RepositoryPluginOptions): Plugin => {
       }
     },
 
-    // -------------------------------------------------------------------------
-    // buildStart — copy repository files into public/ so they are served at
-    // runtime under /repository/<relative-path>.
-    // -------------------------------------------------------------------------
     buildStart() {
       const logger = {
         info: (msg: string) =>
           resolvedConfig?.logger.info(msg) ?? console.log(msg),
       };
 
-      copyRepositoryToPublic(absRepositoryPath, absPublicDestDir, ignoreSet, logger);
+      copyRepositoryToPublic(
+        absRepositoryPath,
+        absPublicDestDir,
+        ignoreSet,
+        logger,
+      );
     },
 
-    // -------------------------------------------------------------------------
-    // configureServer — also copy in dev mode and watch for changes.
-    // -------------------------------------------------------------------------
     configureServer(server) {
       const logger = {
         info: (msg: string) => server.config.logger.info(msg),
       };
 
-      // Initial copy when dev server starts.
-      copyRepositoryToPublic(absRepositoryPath, absPublicDestDir, ignoreSet, logger);
+      copyRepositoryToPublic(
+        absRepositoryPath,
+        absPublicDestDir,
+        ignoreSet,
+        logger,
+      );
 
       if (!fs.existsSync(absRepositoryPath)) return;
 
@@ -320,8 +457,12 @@ export default (options: RepositoryPluginOptions): Plugin => {
 
         // If the changed file is matched by any bundled pattern, invalidate
         // the virtual module so HMR picks up the new content.
-        if (matchesBundledPattern(relative, bundledFiles, absRepositoryPath)) {
-          const mod = server.moduleGraph.getModuleById(resolvedVirtualModuleId);
+        if (
+          matchesBundledPattern(relative, bundledFiles, absRepositoryPath)
+        ) {
+          const mod = server.moduleGraph.getModuleById(
+            resolvedVirtualModuleId,
+          );
           if (mod) {
             server.moduleGraph.invalidateModule(mod);
           }
@@ -331,15 +472,6 @@ export default (options: RepositoryPluginOptions): Plugin => {
       });
     },
 
-    // -------------------------------------------------------------------------
-    // Virtual module — `import repository from "virtual:repository"`
-    //
-    // Shape:
-    // {
-    //   bundled: Record<string, string>;   // relativePath → content (inline)
-    //   baseUrl: string;                   // e.g. "/repository"
-    // }
-    // -------------------------------------------------------------------------
     resolveId(id) {
       if (id === virtualModuleId) {
         return resolvedVirtualModuleId;
@@ -349,15 +481,14 @@ export default (options: RepositoryPluginOptions): Plugin => {
     load(id) {
       if (id !== resolvedVirtualModuleId) return;
 
-      const absPath = path.resolve(
-        resolvedConfig?.root ?? process.cwd(),
-        repositoryPath,
+      const bundled = readBundledFiles(
+        absRepositoryPath,
+        bundledFiles,
+        ignoreSet,
       );
 
-      const bundled = readBundledFiles(absPath, bundledFiles, ignoreSet);
-
-      console.log(
-        `[repository](load): bundled ${Object.keys(bundled).length} file(s) from "${absPath}"`,
+      resolvedConfig?.logger.info(
+        `[repository](load): bundled ${Object.keys(bundled).length} file(s) from "${absRepositoryPath}"`,
       );
 
       return [
@@ -368,3 +499,7 @@ export default (options: RepositoryPluginOptions): Plugin => {
     },
   };
 };
+
+const repository = { load, plugin };
+
+export default repository;

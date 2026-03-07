@@ -39,6 +39,16 @@ export const ListProvider: React.FC<{ children: React.ReactNode }> = ({
     isLoading,
     error,
   } = useQuery<AwesomeList>({
+    /**
+     * TODO: current problem
+     * When list is modified, useQuery is re-triggered because queryKey changes
+     * Issue with that is the the value of the data is reset during the fetch and is set to the initialData for the time of the query before being set to its new value again
+     * This causes a flickering effect on the UI
+     * TODO: fix that because this was a quick solution to make list reactive to changes in the repository, it is reactive as it is but I needed to apply the pre-processing in query function.
+     *
+     * Possible solution would be to persist a version of the processed list file, update it when we have a change and on the background save to the repository with debounce or somthhing like that.
+     * If a better solution exists then go withit, implement it in a clean and very clean way.
+     */
     queryKey: ["awesome-list", repository.files.new["list.yaml"]],
     initialData: {
       title: "",
