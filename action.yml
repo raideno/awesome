@@ -34,7 +34,6 @@ runs:
       with:
         repository: raideno/awesome
         ref: ${{ steps.awesome-ref.outputs.value }}
-        fetch-depth: 0
         path: awesome-src
 
     - name: setup node.js
@@ -87,30 +86,14 @@ runs:
     - name: get user repository commit hash
       id: user-commit
       run: |
+        cd "${{ github.workspace }}"
         echo "hash=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      shell: bash
-
-    - name: get awesome tag
-      id: awesome-tag
-      run: |
-        cd awesome-src
-        TAG="${{ github.action_ref }}"
-        if [ -z "$TAG" ]; then
-          TAG=$(git describe --tags --exact-match 2>/dev/null || true)
-        fi
-        if [ -z "$TAG" ]; then
-          TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
-        fi
-        if [ -z "$TAG" ]; then
-          TAG=$(git rev-parse --short HEAD)
-        fi
-        echo "tag=$TAG" >> "$GITHUB_OUTPUT"
       shell: bash
 
     - name: build internal packages
       run: |
         cd awesome-src
-        npm run build --workspace storage-service
+        npm run build --workspace packages/services/storage
       shell: bash
 
     - name: build awesome website
@@ -120,14 +103,15 @@ runs:
         PLUGINS_DIRECTORY_PATH: ${{ inputs.plugins-directory-path }}
         REPOSITORY_DIRECTORY_PATH: ${{ steps.repo-dir.outputs.value }}
         GITHUB_REPOSITORY_URL: https://github.com/${{ github.repository }}
-        GITHUB_WORKFLOW_REF: ${{ github.workflow_ref }}
         USER_REPOSITORY_COMMIT_HASH: ${{ steps.user-commit.outputs.hash }}
-        AWESOME_WEBSITE_TAG: ${{ steps.awesome-tag.outputs.tag }}
+        AWESOME_WEBSITE_TAG: ${{ steps.awesome-ref.outputs.value }}
       run: |
         cd awesome-src
         npm run build --workspace website
       shell: bash
 
+    # Kept for backward compatibility: early adopters referenced awesome-website-src/dist
+    # directly in their upload-pages-artifact step. New users should use awesome-src/packages/website/dist.
     - name: backward compatibility
       run: |
         mkdir -p awesome-website-src

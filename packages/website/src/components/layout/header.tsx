@@ -15,16 +15,10 @@ import {
   Text,
   Tooltip,
 } from "@radix-ui/themes";
-import type { PluginDefinition } from "shared/types/plugins";
 
 export interface HeaderProps {}
 
 const MAX_HEADER_TAGS = 4;
-
-type HeaderActionExtension = Extract<
-  PluginDefinition["extensions"][number],
-  { type: "site.header-action" }
->;
 
 const HeaderActionExtensions: React.FC = () => {
   const plugins = usePlugins();
@@ -37,10 +31,8 @@ const HeaderActionExtensions: React.FC = () => {
     }))
     .flatMap((plugin) => plugin.extensions)
     .filter((ext) => ext.type === "site.header-action")
-    .filter((ext) => !(ext as HeaderActionExtension & { pluginId: string }).admin || editingEnabled)
-    .filter((ext) => plugins.ready.includes((ext as HeaderActionExtension & { pluginId: string }).pluginId)) as Array<
-      HeaderActionExtension & { pluginId: string }
-    >;
+    .filter((ext) => !ext.admin || editingEnabled)
+    .filter((ext) => plugins.ready.includes(ext.pluginId));
 
   return (
     <>
