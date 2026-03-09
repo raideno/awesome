@@ -4,6 +4,10 @@ branding:
   icon: book-open
   color: orange
 inputs:
+  inputs:
+    ref:
+      description: "Ref to use for the awesome source. Defaults to the action ref."
+      required: true
   yaml-path:
     description: "Path to the YAML file to use as data source, relative to repository-directory-path (or the workspace root if not set)."
     required: true
@@ -22,7 +26,7 @@ runs:
     - name: determine awesome source ref
       id: awesome-ref
       run: |
-        REF="${{ github.action_ref }}"
+        REF="${{ inputs.ref }}"
         if [ -z "$REF" ]; then
           REF="main"
         fi
