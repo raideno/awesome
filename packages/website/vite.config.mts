@@ -19,7 +19,7 @@ const EnvironmentSchema = z
 
     LIST_FILE_PATH: z.string().nonempty().optional().default("list.yaml"),
 
-    PLUGINS_DIRECTORY_PATH: z.string().nonempty().optional(),
+    PLUGINS_DIRECTORY_PATH: z.string().optional(),
 
     REPOSITORY_DIRECTORY_PATH: z.string(),
     REPOSITORY_BUNDLED_FILES: z.string().optional().default(""),
