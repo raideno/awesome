@@ -45,6 +45,13 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
         shell: bash
 
+      - name: install plugin dependencies
+        working-directory: packages/website
+        env:
+          PLUGINS_DIRECTORY_PATH: plugins
+          REPOSITORY_DIRECTORY_PATH: ${{ github.workspace }}/example
+        run: npm run install-plugin-deps
+
       - name: build
         env:
           BASE: /

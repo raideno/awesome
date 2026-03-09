@@ -96,6 +96,15 @@ runs:
         npm run build --workspace packages/services/storage
       shell: bash
 
+    - name: install plugin dependencies
+      env:
+        PLUGINS_DIRECTORY_PATH: ${{ inputs.plugins-directory-path }}
+        REPOSITORY_DIRECTORY_PATH: ${{ steps.repo-dir.outputs.value }}
+      run: |
+        cd awesome-src/packages/website
+        npm run install-plugin-deps
+      shell: bash
+
     - name: build awesome website
       env:
         BASE: ${{ steps.base.outputs.value }}

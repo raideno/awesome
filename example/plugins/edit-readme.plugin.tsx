@@ -6,7 +6,12 @@ import "katex/dist/katex.min.css";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 
-import { EyeOpenIcon, Half1Icon, InfoCircledIcon, Pencil1Icon } from "@radix-ui/react-icons";
+import {
+  EyeOpenIcon,
+  Half1Icon,
+  InfoCircledIcon,
+  Pencil1Icon,
+} from "@radix-ui/react-icons";
 import {
   Box,
   Button,
@@ -48,13 +53,16 @@ const EditReadmeButton: React.FC<EditReadmeButtonProps> = ({ context }) => {
 
     setIsLoaded(false);
 
-    context.repository.get(README_PATH).then((content) => {
-      setLocalValue(content);
-      setIsLoaded(true);
-    }).catch(() => {
-      setLocalValue("");
-      setIsLoaded(true);
-    });
+    context.repository
+      .get(README_PATH)
+      .then((content) => {
+        setLocalValue(content || "");
+        setIsLoaded(true);
+      })
+      .catch(() => {
+        setLocalValue("");
+        setIsLoaded(true);
+      });
   }, [open]);
 
   const handleReadmeChange = useCallback(
@@ -96,7 +104,10 @@ const EditReadmeButton: React.FC<EditReadmeButtonProps> = ({ context }) => {
           have edit permissions, you can switch between edit, live, and preview
           modes to modify the README content in markdown format.
         </Dialog.Description>
-        <ScrollArea style={{ height: "100%" }} className="max-w-5xl pt-8 mx-auto">
+        <ScrollArea
+          style={{ height: "100%" }}
+          className="max-w-5xl pt-8 mx-auto"
+        >
           <Flex direction="column" p="0" gap="4">
             <Flex direction="column" gap="0">
               <Flex direction="row" justify="between" align="center">

@@ -260,25 +260,15 @@ export default (pluginsDirectoryPath?: string): Plugin => {
     },
 
     buildStart() {
-      if (!pluginsDirectoryPath) return;
-
-      const absPluginsDir = path.resolve(
-        resolvedConfig?.root ?? process.cwd(),
-        pluginsDirectoryPath,
-      );
-
-      if (!fs.existsSync(absPluginsDir)) return;
-
-      const pluginFilePaths = fs.globSync(
-        path.join(absPluginsDir, "*.plugin.{ts,js,tsx,jsx}"),
-      );
-
-      if (pluginFilePaths.length === 0) return;
-
-      ensurePluginDeps(pluginFilePaths, resolvedConfig?.root ?? process.cwd(), {
-        info: (msg) => resolvedConfig?.logger.info(msg) ?? console.log(msg),
-        warn: (msg) => resolvedConfig?.logger.warn(msg) ?? console.warn(msg),
-      });
+      // NOTE: dependency installation is intentionally NOT done here.
+      // Running `npm install` inside a Vite hook mutates node_modules while
+      // Vite's build process is actively using it. Vite writes internal chunks
+      // with content-hash filenames; if npm rewrites those files mid-build the
+      // already-loaded entry chunk can no longer find its sibling chunks,
+      // producing "Cannot find module …/dep-Xxxxx.js" errors.
+      //
+      // Instead, run the `install-plugin-deps` npm script as a dedicated step
+      // BEFORE `vite build` in CI (see .github/workflows/build.yaml).
     },
 
     configureServer(server) {
