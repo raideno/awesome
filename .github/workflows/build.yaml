@@ -18,7 +18,7 @@ jobs:
       - name: setup node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: install dependencies
         run: npm ci
@@ -45,12 +45,25 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
         shell: bash
 
+      - name: install plugin dependencies
+        working-directory: packages/website
+        env:
+          PLUGINS_DIRECTORY_PATH: plugins
+          REPOSITORY_DIRECTORY_PATH: ${{ github.workspace }}/example
+        run: npm run install-plugin-deps
+
       - name: build
         env:
-          BASE_PATH: /
-          LIST_FILE_PATH: ./example.list.yaml
+          BASE: /
+          LIST_FILE_PATH: list.yaml
+          PLUGINS_DIRECTORY_PATH: plugins
+          REPOSITORY_DIRECTORY_PATH: ${{ github.workspace }}/example
           GITHUB_REPOSITORY_URL: https://github.com/raideno/awesome
+          GITHUB_WORKFLOW_REF: ${{ github.workflow_ref }}
           USER_REPOSITORY_COMMIT_HASH: ${{ steps.user-commit.outputs.hash }}
           AWESOME_WEBSITE_TAG: ${{ steps.awesome-tag.outputs.tag }}
-          GITHUB_WORKFLOW_REF: ${{ github.workflow_ref }}
         run: npm run build
+
+      - name: typecheck
+        working-directory: packages/website
+        run: npm run typecheck

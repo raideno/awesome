@@ -3,7 +3,7 @@ name: validate awesome list schema
 on:
   pull_request:
   push:
-    branches: ['*']
+    branches: ["*"]
 
 jobs:
   validate-schema:
@@ -15,7 +15,7 @@ jobs:
       - name: setup up node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "24"
 
       - name: install dependencies
         run: npm ci

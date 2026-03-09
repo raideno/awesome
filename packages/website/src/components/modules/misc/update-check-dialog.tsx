@@ -25,8 +25,9 @@ import { toast } from "sonner";
 
 import { useList } from "@/contexts/list";
 
-import { GitHubService } from "@raideno/github-service";
-import type { AwesomeList } from "shared/types/awesome-list";
+import { GitHubService } from "storage-service";
+import { createRepositoryService } from "@/hooks/repository-service";
+import type { AwesomeList } from "shared/types/list";
 import { replaceTextareaTypeInPlace } from "shared/lib/utils";
 
 const AWESOME_ACTION_OWNER = "raideno";
@@ -286,13 +287,25 @@ export const UpdateCheckDialog: React.FC<UpdateCheckDialogProps> = ({
         repo: AWESOME_ACTION_REPO,
       });
 
-      const schemaFile = await github.getFirstExistingFileAtRef(
-        [
-          "packages/website/awesome.list.schema.json",
-          "awesome.list.schema.json",
-        ],
-        targetTag,
-      );
+      const schemaPaths = [
+        "packages/website/awesome.list.schema.json",
+        "awesome.list.schema.json",
+      ];
+      let schemaFile: { path: string; content: string; sha: string } | null = null;
+      for (const schemaPath of schemaPaths) {
+        try {
+          const file = await github.read(schemaPath, targetTag);
+          schemaFile = { path: schemaPath, content: file.content, sha: file.sha };
+          break;
+        } catch {
+          // try next path
+        }
+      }
+      if (!schemaFile) {
+        throw new Error(
+          `None of the files were found at ref '${targetTag}': ${schemaPaths.join(", ")}`,
+        );
+      }
 
       const jsonSchema = replaceTextareaTypeInPlace(
         JSON.parse(schemaFile.content),
@@ -432,40 +445,13 @@ export const UpdateCheckDialog: React.FC<UpdateCheckDialogProps> = ({
     setIsUpdating(true);
 
     try {
-      const github = new GitHubService({
+      const storage = createRepositoryService({
         token: githubToken,
         owner: __CONFIGURATION__.repository.owner,
         repo: __CONFIGURATION__.repository.name,
       });
 
-      const workflowStatus = await github.getDeploymentWorkflowRuns(
-        __CONFIGURATION__.repository.workflow.name,
-      );
-
-      if (workflowStatus.isRunning) {
-        const workflowUrl = workflowStatus.latestRun?.html_url;
-        toast.info("Update in progress", {
-          description: workflowUrl ? (
-            <span>
-              A deployment workflow is already running.{" "}
-              <a
-                href={workflowUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ textDecoration: "underline", fontWeight: "bold" }}
-              >
-                View workflow
-              </a>
-            </span>
-          ) : (
-            "A deployment workflow is already running. Please wait for it to complete."
-          ),
-        });
-        onOpenChange(false);
-        return;
-      }
-
-      const result = await github.updateWorkflowActionRef({
+      const result = await storage.bump({
         workflowIdentifier: __CONFIGURATION__.repository.workflow.name,
         actionSlug: "raideno/awesome",
         legacyActionSlugs: ["raideno/awesome-website"],

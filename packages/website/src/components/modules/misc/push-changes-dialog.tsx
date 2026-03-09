@@ -9,39 +9,26 @@ import {
   Heading,
   Text,
   Tabs,
+  Badge,
 } from "@radix-ui/themes";
 import { MetadataRegistry } from "@raideno/auto-form/registry";
 import { AutoForm } from "@raideno/auto-form/ui";
-import React, { useState, useMemo, type ComponentProps } from "react";
+import React, { type ComponentProps } from "react";
 import { z } from "zod/v4";
 import ReactDiffViewer from "react-diff-viewer-continued";
 
 import { toast } from "sonner";
 
 import { useTheme } from "shared/contexts/theme";
-import type { AwesomeList } from "shared/types/awesome-list";
 
-import { useList } from "@/contexts/list";
+import { useRepository } from "@/contexts/repository";
 import { useGitHubAuth } from "@/hooks/github-auth";
-import { getWorkflowStatus } from "@/hooks/workflow-status";
-import { GitHubService } from "@raideno/github-service";
-
-import * as yaml from "js-yaml";
-
-interface PushChangesDialogProps {
-  children?: React.ReactNode;
-  yamlContent: AwesomeList;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-}
+import { useModals } from "@/contexts/dialogs";
 
 const PushChangesFormSchema = z.object({
   repository: z
     .string()
     .register(MetadataRegistry, { label: "Repository*", disabled: true }),
-  path: z
-    .string()
-    .register(MetadataRegistry, { label: "YAML File Path*", disabled: true }),
   message: z
     .string()
     .min(1)
@@ -49,54 +36,21 @@ const PushChangesFormSchema = z.object({
     .register(MetadataRegistry, { label: "Commit Message*", disabled: false }),
 });
 
+interface PushChangesDialogProps {
+  children?: React.ReactNode;
+}
+
 export const PushChangesDialog: React.FC<PushChangesDialogProps> = ({
   children,
-  yamlContent,
-  open: controlledOpen,
-  onOpenChange: controlledOnOpenChange,
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
   const githubAuth = useGitHubAuth();
-  const { clearChanges, syncRemoteList, content } = useList();
+  const repository = useRepository();
   const { theme } = useTheme();
 
-  const dialogOpen = controlledOpen !== undefined ? controlledOpen : isOpen;
-  const setDialogOpen = controlledOnOpenChange || setIsOpen;
+  const { isOpen: dialogOpen, setOpen: setDialogOpen } = useModals("push-changes-dialog");
 
-  // Generate YAML content for old and new versions
-  const { oldYaml, newYaml, hasYamlChanges } = useMemo(() => {
-    const { readme: oldReadme, ...oldYamlData } = content.old;
-    const { readme: newReadme, ...newYamlData } = yamlContent;
-
-    const oldYaml = yaml.dump(oldYamlData, {
-      indent: 2,
-      lineWidth: -1,
-      noRefs: true,
-    });
-    const newYaml = yaml.dump(newYamlData, {
-      indent: 2,
-      lineWidth: -1,
-      noRefs: true,
-    });
-
-    return {
-      oldYaml,
-      newYaml,
-      hasYamlChanges: oldYaml !== newYaml,
-    };
-  }, [content.old, yamlContent]);
-
-  // Check for README changes
-  const { oldReadme, newReadme, hasReadmeChanges } = useMemo(() => {
-    const oldReadme = content.old.readme || "";
-    const newReadme = yamlContent.readme || "";
-
-    return {
-      oldReadme,
-      newReadme,
-      hasReadmeChanges: oldReadme !== newReadme,
-    };
-  }, [content.old.readme, yamlContent.readme]);
+  const changedFiles = Object.values(repository.changes);
+  const changedCount = changedFiles.length;
 
   const handleError = () => {
     toast.error("Something is wrong with your inputs.");
@@ -115,41 +69,20 @@ export const PushChangesDialog: React.FC<PushChangesDialogProps> = ({
           return;
         }
 
-        const status = await getWorkflowStatus({ token: githubAuth.token });
-
-        if (status.isWorkflowRunning) {
-          toast.error("Build in progress", {
-            description:
-              "Cannot push changes while website is being updated. Please wait for the build to complete.",
-          });
-          return;
-        }
-
-        const github = new GitHubService({
-          token: githubAuth.token,
-          owner: __CONFIGURATION__.repository.owner,
-          repo: __CONFIGURATION__.repository.name,
-        });
-
-        await github.update(data.path, yamlContent, data.message);
+        await repository.push(data.message);
 
         toast.success("Changes pushed successfully!", {
-          description: "The repository has been updated",
+          description: "The repository has been updated.",
         });
 
         setDialogOpen(false);
-
-        // NOTE: optimistic update, set the new list as the base list and clear changes to disable update button until new changes are made
-        syncRemoteList(yamlContent);
       } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : "An unexpected error occurred";
         toast.error("Failed to push changes", {
-          description: errorMessage,
+          description: err instanceof Error ? err.message : "An unexpected error occurred",
         });
       }
     } else if (tag === "discard") {
-      clearChanges();
+      repository.reset();
       setDialogOpen(false);
     } else {
       toast.error("Unknown action. Please try again.");
@@ -163,7 +96,6 @@ export const PushChangesDialog: React.FC<PushChangesDialogProps> = ({
         <Dialog.Content style={{ maxWidth: "90vw", width: "1200px" }}>
           <AutoForm.Root
             defaultValues={{
-              path: __CONFIGURATION__.list.path,
               repository: `${__CONFIGURATION__.repository.owner}/${__CONFIGURATION__.repository.name}`,
               message: "chore: update",
             }}
@@ -172,16 +104,15 @@ export const PushChangesDialog: React.FC<PushChangesDialogProps> = ({
             onSubmit={handleSubmit}
           >
             <Flex direction="column" gap="4">
+              {/* Header */}
               <Box>
-                <>
-                  <Dialog.Title className="sr-only">
-                    Push Changes to Repository
-                  </Dialog.Title>
-                  <Dialog.Description className="sr-only">
-                    Review and confirm pushing your changes to the repository.
-                  </Dialog.Description>
-                </>
-                <Flex direction={"row"} align={"center"} justify={"between"}>
+                <Dialog.Title className="sr-only">
+                  Push Changes to Repository
+                </Dialog.Title>
+                <Dialog.Description className="sr-only">
+                  Review and confirm pushing your changes to the repository.
+                </Dialog.Description>
+                <Flex direction="row" align="center" justify="between">
                   <Heading>Push Changes to Repository</Heading>
                   <Button
                     type="button"
@@ -196,6 +127,7 @@ export const PushChangesDialog: React.FC<PushChangesDialogProps> = ({
                 </Text>
               </Box>
 
+              {/* Auth warning */}
               {!githubAuth.isAuthenticated && (
                 <Callout.Root color="red">
                   <Callout.Icon>
@@ -208,83 +140,65 @@ export const PushChangesDialog: React.FC<PushChangesDialogProps> = ({
                 </Callout.Root>
               )}
 
+              {/* No changes notice */}
+              {changedCount === 0 && (
+                <Callout.Root>
+                  <Callout.Text>There are no changes to push.</Callout.Text>
+                </Callout.Root>
+              )}
+
               <AutoForm.Content />
 
-              {/* Preview Changes Section */}
-              <Box>
-                <Heading size="3" mb="2">
-                  Preview Changes
-                </Heading>
-                <Tabs.Root defaultValue="yaml">
-                  <Tabs.List>
-                    <Tabs.Trigger value="yaml">
-                      list.yaml {hasYamlChanges && "(Modified)"}
-                    </Tabs.Trigger>
-                    {hasReadmeChanges && (
-                      <Tabs.Trigger value="readme">
-                        README.md (Modified)
-                      </Tabs.Trigger>
-                    )}
-                  </Tabs.List>
+              {/* Diff preview */}
+              {changedCount > 0 && (
+                <Box>
+                  <Flex align="center" gap="2" mb="2">
+                    <Heading size="3">Preview Changes</Heading>
+                    <Badge color="orange" variant="soft" size="1">
+                      {changedCount} file{changedCount !== 1 ? "s" : ""}
+                    </Badge>
+                  </Flex>
 
-                  <Box pt="3">
-                    <Tabs.Content value="yaml">
-                      {hasYamlChanges ? (
-                        <Box
-                          style={{
-                            maxHeight: "400px",
-                            overflow: "auto",
-                            border: "1px solid var(--gray-6)",
-                            borderRadius: "var(--radius-2)",
-                          }}
-                        >
-                          <ReactDiffViewer
-                            oldValue={oldYaml}
-                            newValue={newYaml}
-                            splitView={true}
-                            useDarkTheme={theme === "dark"}
-                            leftTitle="Current (Remote)"
-                            rightTitle="New (Local)"
-                            hideLineNumbers={false}
-                          />
-                        </Box>
-                      ) : (
-                        <Callout.Root>
-                          <Callout.Text>
-                            No changes to list.yaml file
-                          </Callout.Text>
-                        </Callout.Root>
-                      )}
-                    </Tabs.Content>
+                  <Tabs.Root defaultValue={changedFiles[0].path}>
+                    <Tabs.List>
+                      {changedFiles.map(({ path }) => (
+                        <Tabs.Trigger key={path} value={path}>
+                          {path}
+                        </Tabs.Trigger>
+                      ))}
+                    </Tabs.List>
 
-                    {hasReadmeChanges && (
-                      <Tabs.Content value="readme">
-                        <Box
-                          style={{
-                            maxHeight: "400px",
-                            overflow: "auto",
-                            border: "1px solid var(--gray-6)",
-                            borderRadius: "var(--radius-2)",
-                          }}
-                        >
-                          <ReactDiffViewer
-                            oldValue={oldReadme}
-                            newValue={newReadme}
-                            splitView={true}
-                            useDarkTheme={theme === "dark"}
-                            leftTitle="Current (Remote)"
-                            rightTitle="New (Local)"
-                            hideLineNumbers={false}
-                          />
-                        </Box>
-                      </Tabs.Content>
-                    )}
-                  </Box>
-                </Tabs.Root>
-              </Box>
+                    <Box pt="3">
+                      {changedFiles.map(({ path, old: oldContent, new: newContent }) => (
+                        <Tabs.Content key={path} value={path}>
+                          <Box
+                            style={{
+                              maxHeight: "400px",
+                              overflow: "auto",
+                              border: "1px solid var(--gray-6)",
+                              borderRadius: "var(--radius-2)",
+                            }}
+                          >
+                            <ReactDiffViewer
+                              oldValue={oldContent}
+                              newValue={newContent}
+                              splitView={true}
+                              useDarkTheme={theme === "dark"}
+                              leftTitle="Current (Remote)"
+                              rightTitle="New (Local)"
+                              hideLineNumbers={false}
+                            />
+                          </Box>
+                        </Tabs.Content>
+                      ))}
+                    </Box>
+                  </Tabs.Root>
+                </Box>
+              )}
 
+              {/* Actions */}
               <AutoForm.Actions>
-                <Flex direction={"column"} gap="3" justify="end">
+                <Flex direction="column" gap="3" justify="end">
                   <AutoForm.Action tag="discard" variant="soft" color="red">
                     Discard Changes
                   </AutoForm.Action>

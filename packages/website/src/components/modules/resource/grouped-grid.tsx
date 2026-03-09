@@ -17,11 +17,18 @@ import React, { type ComponentProps } from "react";
 import { toast } from "sonner";
 import { z } from "zod/v4";
 
-import type { AwesomeListElement } from "shared/types/awesome-list";
+import type { AwesomeListElement } from "shared/types/list";
 
 import { useEditing } from "@/contexts/editing";
 import { useFilter } from "@/contexts/filter";
 import { useList } from "@/contexts/list";
+import { usePlugins } from "@/contexts/plugins";
+import type { PluginDefinition } from "shared/types/plugins";
+
+type GroupContextAction = Extract<
+  PluginDefinition["extensions"][number],
+  { type: "group.context-action" }
+>;
 
 import { GroupsControllerFactory } from "@/components/controllers/groups-input";
 import { OnlyWhenEditingEnabled } from "@/components/layout/only-when-editing-enabled";
@@ -29,6 +36,7 @@ import { ResourceCard } from "@/components/modules/resource/card";
 import { ResourceCardContextMenu } from "@/components/modules/resource/card-context-menu";
 import { ResourceCreateSheet } from "@/components/modules/resource/create-sheet";
 import { AdminOnly } from "@/components/utils/admin-only";
+import { useModals } from "@/contexts/dialogs";
 
 export interface GroupedResourceGridProps {
   filteredElements: Array<AwesomeListElement>;
@@ -43,10 +51,19 @@ const GroupContainer: React.FC<{
   elements: Array<AwesomeListElement>;
   color: string;
 }> = ({ groupName, elements, color }) => {
-  const [createSheetOpen, setCreateSheetOpen] = React.useState(false);
+  const { setOpen: setCreateSheetOpen } = useModals("element.create.sheet");
   const [renameDialogOpen, setRenameDialogOpen] = React.useState(false);
   const { editingEnabled } = useEditing();
   const list = useList();
+  const plugins = usePlugins();
+
+  const groupContextActions = plugins.plugins
+    .map((plugin) => ({ ...plugin, extensions: plugin.extensions.map((extension) => ({ ...extension, pluginId: plugin.id }))}))
+    .flatMap((plugin) => plugin.extensions)
+    .filter((extension) => extension.type === "group.context-action") as Array<GroupContextAction & { pluginId: string }>;
+
+  const publicGroupActions = groupContextActions.filter((a) => !a.admin);
+  const adminGroupActions = groupContextActions.filter((a) => a.admin);
 
   const groups = Array.from(
     new Set(
@@ -72,7 +89,7 @@ const GroupContainer: React.FC<{
       }
 
       try {
-        await list.updateList({
+        await list.update({
           elements: list.content.new.elements.map((el) => {
             const elementGroup = el.group || "Ungrouped";
             const belongsToGroup = elementGroup === groupName;
@@ -100,7 +117,7 @@ const GroupContainer: React.FC<{
   return (
     <>
       <ContextMenu.Root>
-        <ContextMenu.Trigger disabled={!editingEnabled}>
+        <ContextMenu.Trigger disabled={!editingEnabled && publicGroupActions.length === 0}>
           <Card
             className="transition-all contain-none"
             style={{
@@ -143,8 +160,23 @@ const GroupContainer: React.FC<{
           </Card>
         </ContextMenu.Trigger>
         <ContextMenu.Content>
+          {publicGroupActions.length > 0 && (
+            <>
+              {publicGroupActions.map((action) => (
+                <ContextMenu.Item key={action.name} onClick={() => action.onClick(plugins.context(action.pluginId))}>
+                  {action.name}
+                </ContextMenu.Item>
+              ))}
+              <ContextMenu.Separator />
+            </>
+          )}
           <OnlyWhenEditingEnabled>
             <AdminOnly>
+              {adminGroupActions.map((action) => (
+                <ContextMenu.Item key={action.name} onClick={() => action.onClick(plugins.context(action.pluginId))}>
+                  {action.name}
+                </ContextMenu.Item>
+              ))}
               <ContextMenu.Item onClick={() => setCreateSheetOpen(true)}>
                 <Flex align="center" gap="2">
                   <PlusIcon />
@@ -165,10 +197,6 @@ const GroupContainer: React.FC<{
       <OnlyWhenEditingEnabled>
         <>
           <ResourceCreateSheet
-            state={{
-              open: createSheetOpen,
-              onOpenChange: setCreateSheetOpen,
-            }}
             defaults={
               groupName !== "Ungrouped" ? { group: groupName } : undefined
             }

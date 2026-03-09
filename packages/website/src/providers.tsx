@@ -6,13 +6,16 @@ import { useTheme } from "shared/contexts/theme";
 
 import type React from "react";
 
+import { AlertDialogProvider } from "@/components/utils/alert-dialog";
+
 import { EditingProvider } from "@/contexts/editing";
 import { FilterProvider } from "@/contexts/filter";
 import { ListProvider } from "@/contexts/list";
 import { MarkersProvider } from "@/contexts/markers";
 import { NetworkProvider } from "@/contexts/network";
-
-import { AlertDialogProvider } from "@/components/utils/alert-dialog";
+import { PluginsProvider } from "@/contexts/plugins";
+import { ModalsProvider } from "@/contexts/dialogs";
+import { RepositoryProvider } from "@/contexts/repository";
 
 export interface ProvidersProps {
   children: React.ReactNode;
@@ -37,16 +40,22 @@ export const Providers: React.FC<ProvidersProps> = ({ children }) => {
         <QueryClientProvider client={queryClient}>
           <AlertDialogProvider>
             <NetworkProvider>
-              <EditingProvider>
-                <ListProvider>
-                  <FilterProvider>
-                    <MarkersProvider>
-                      <Toaster />
-                      <>{children}</>
-                    </MarkersProvider>
-                  </FilterProvider>
-                </ListProvider>
-              </EditingProvider>
+              <RepositoryProvider>
+                <ModalsProvider>
+                  <EditingProvider>
+                    <ListProvider>
+                      <PluginsProvider>
+                        <FilterProvider>
+                          <MarkersProvider>
+                            <Toaster />
+                            <>{children}</>
+                          </MarkersProvider>
+                        </FilterProvider>
+                      </PluginsProvider>
+                    </ListProvider>
+                  </EditingProvider>
+                </ModalsProvider>
+              </RepositoryProvider>
             </NetworkProvider>
           </AlertDialogProvider>
         </QueryClientProvider>

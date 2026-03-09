@@ -4,11 +4,20 @@ branding:
   icon: book-open
   color: orange
 inputs:
-  yaml-path:
-    description: "Path to the YAML file to use as data source."
+  ref:
+    description: "Ref to use for the awesome source. Defaults to the action ref."
     required: true
-  base-path:
-    description: "Optional base path (e.g. /my-site/) to host under. Default is the repository name to support github pages."
+  yaml-path:
+    description: "Path to the YAML file to use as data source, relative to repository-directory-path (or the workspace root if not set)."
+    required: true
+  plugins-directory-path:
+    description: "Optional path to a directory containing custom plugins, relative to repository-directory-path (or the workspace root if not set). Default is 'plugins'."
+    required: false
+  base:
+    description: "Optional base path (e.g. /my-site/) to host under. Default is the repository name to support GitHub Pages."
+    required: false
+  repository-directory-path:
+    description: "Optional path (relative to the workspace root) to the sub-directory that should be treated as the repository root. When set, yaml-path and plugins-directory-path are resolved relative to this sub-directory. Defaults to the workspace root."
     required: false
 runs:
   using: "composite"
@@ -16,7 +25,7 @@ runs:
     - name: determine awesome source ref
       id: awesome-ref
       run: |
-        REF="${{ github.action_ref }}"
+        REF="${{ inputs.ref }}"
         if [ -z "$REF" ]; then
           REF="main"
         fi
@@ -28,13 +37,12 @@ runs:
       with:
         repository: raideno/awesome
         ref: ${{ steps.awesome-ref.outputs.value }}
-        fetch-depth: 0
         path: awesome-src
 
     - name: setup node.js
       uses: actions/setup-node@v4
       with:
-        node-version: "20"
+        node-version: "24"
 
     - name: install dependencies
       run: |
@@ -42,23 +50,49 @@ runs:
         npm ci
       shell: bash
 
+    - name: determine repository directory
+      id: repo-dir
+      run: |
+        if [ -n "${{ inputs.repository-directory-path }}" ]; then
+          echo "value=${{ github.workspace }}/${{ inputs.repository-directory-path }}" >> "$GITHUB_OUTPUT"
+        else
+          echo "value=${{ github.workspace }}" >> "$GITHUB_OUTPUT"
+        fi
+      shell: bash
+
+    - name: stage user repository files
+      run: |
+        REPO_DIR="${{ steps.repo-dir.outputs.value }}"
+        STAGING_DIR="awesome-src/packages/website/user-repository"
+        mkdir -p "$STAGING_DIR"
+        # Copy everything from the user repo except git internals and node_modules
+        rsync -a \
+          --exclude='.git' \
+          --exclude='node_modules' \
+          --exclude='.DS_Store' \
+          "$REPO_DIR/" "$STAGING_DIR/"
+        echo "[awesome]: staged user repository to $STAGING_DIR"
+      shell: bash
+
     - name: copy user YAML file
       run: |
-        cp ${{ github.workspace }}/${{ inputs.yaml-path }} awesome-src/packages/website/${{ inputs.yaml-path }}
-        YAML_DIR=$(dirname "${{ github.workspace }}/${{ inputs.yaml-path }}")
-        if [ -f "$YAML_DIR/README.md" ]; then
-          cp "$YAML_DIR/README.md" awesome-src/packages/website/$(dirname "${{ inputs.yaml-path }}")/README.md
+        STAGING_DIR="awesome-src/packages/website/user-repository"
+        DEST_YAML="awesome-src/packages/website/${{ inputs.yaml-path }}"
+        mkdir -p "$(dirname "$DEST_YAML")"
+        cp "$STAGING_DIR/${{ inputs.yaml-path }}" "$DEST_YAML"
+        if [ -f "$STAGING_DIR/$(dirname "${{ inputs.yaml-path }}")/README.md" ]; then
+          cp "$STAGING_DIR/$(dirname "${{ inputs.yaml-path }}")/README.md" "awesome-src/packages/website/$(dirname "${{ inputs.yaml-path }}")/README.md"
           echo "[awesome]: README.md copied."
         else
           echo "[awesome]: No README.md found, skipping."
         fi
       shell: bash
 
-    - name: determine BASE_PATH
+    - name: determine BASE
       id: base
       run: |
-        if [ -n "${{ inputs.base-path }}" ]; then
-          echo "value=${{ inputs.base-path }}" >> "$GITHUB_OUTPUT"
+        if [ -n "${{ inputs.base }}" ]; then
+          echo "value=${{ inputs.base }}" >> "$GITHUB_OUTPUT"
         else
           echo "value=/${{ github.event.repository.name }}/" >> "$GITHUB_OUTPUT"
         fi
@@ -67,47 +101,34 @@ runs:
     - name: get user repository commit hash
       id: user-commit
       run: |
+        cd "${{ github.workspace }}"
         echo "hash=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      shell: bash
-
-    - name: get awesome commit hash
-      id: awesome-commit
-      run: |
-        cd awesome-src
-        echo "hash=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-      shell: bash
-
-    - name: get awesome tag
-      id: awesome-tag
-      run: |
-        cd awesome-src
-        TAG="${{ github.action_ref }}"
-        if [ -z "$TAG" ]; then
-          TAG=$(git describe --tags --exact-match 2>/dev/null || true)
-        fi
-        if [ -z "$TAG" ]; then
-          TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
-        fi
-        if [ -z "$TAG" ]; then
-          TAG=$(git rev-parse --short HEAD)
-        fi
-        echo "tag=$TAG" >> "$GITHUB_OUTPUT"
       shell: bash
 
     - name: build internal packages
       run: |
-        cd awesome-src
-        npm run build --workspace @raideno/github-service
+        cd awesome-src/packages/services/storage
+        npm run build
+      shell: bash
+
+    - name: install plugin dependencies
+      env:
+        PLUGINS_DIRECTORY_PATH: ${{ inputs.plugins-directory-path }}
+        REPOSITORY_DIRECTORY_PATH: ${{ github.workspace }}/awesome-src/packages/website/user-repository
+      run: |
+        cd awesome-src/packages/website
+        npm run install-plugin-deps
       shell: bash
 
     - name: build awesome website
       env:
-        BASE_PATH: ${{ steps.base.outputs.value }}
+        BASE: ${{ steps.base.outputs.value }}
         LIST_FILE_PATH: ${{ inputs.yaml-path }}
+        PLUGINS_DIRECTORY_PATH: ${{ inputs.plugins-directory-path }}
+        REPOSITORY_DIRECTORY_PATH: ${{ github.workspace }}/awesome-src/packages/website/user-repository
         GITHUB_REPOSITORY_URL: https://github.com/${{ github.repository }}
         USER_REPOSITORY_COMMIT_HASH: ${{ steps.user-commit.outputs.hash }}
-        AWESOME_WEBSITE_TAG: ${{ steps.awesome-tag.outputs.tag }}
-        GITHUB_WORKFLOW_REF: ${{ github.workflow_ref }}
+        AWESOME_WEBSITE_TAG: ${{ steps.awesome-ref.outputs.value }}
       run: |
         cd awesome-src
         npm run build --workspace website

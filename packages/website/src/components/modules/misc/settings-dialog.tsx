@@ -9,10 +9,9 @@ import { z } from "zod/v4";
 import { PasswordWithToggleController } from "@/components/controllers/password-with-toggle";
 import { useGitHubAuth } from "@/hooks/github-auth";
 import { toast } from "sonner";
+import { useModals } from "@/contexts/dialogs";
 
 interface SettingsDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
 }
 
 const SettingsFormSchema = z.object({
@@ -27,10 +26,9 @@ const SettingsFormSchema = z.object({
 });
 
 export const SettingsDialog: React.FC<SettingsDialogProps> = ({
-  open,
-  onOpenChange,
 }) => {
   const githubAuth = useGitHubAuth();
+  const { isOpen: open, setOpen: onOpenChange } = useModals("settings");
 
   const handleSubmit: ComponentProps<
     typeof AutoForm.Root<typeof SettingsFormSchema>

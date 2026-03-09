@@ -10,7 +10,7 @@ import type React from "react";
 import { UpdateCheckDialog } from "@/components/modules/misc/update-check-dialog";
 import { useEditing } from "@/contexts/editing";
 import { useGitHubAuth } from "@/hooks/github-auth";
-import { GitHubService } from "@raideno/github-service";
+import { GitHubService } from "storage-service";
 import { useNetwork } from "@/contexts/network";
 
 export interface VersionBadgeProps {}
@@ -54,7 +54,7 @@ export const VersionBadge: React.FC<VersionBadgeProps> = () => {
         repo: AWESOME_ACTION_REPO,
       });
 
-      const tags = await github.listTags(50);
+      const tags = await github.versions(50);
       const resolvedTags = tags.map((tag) => tag.name);
       setAvailableTags(
         resolvedTags.length > 0 ? resolvedTags : buildTag ? [buildTag] : [],

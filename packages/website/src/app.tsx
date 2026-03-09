@@ -21,7 +21,7 @@ import { ResourceGrid } from "@/components/modules/resource/grid";
 export interface AppProps {}
 
 export const App: React.FC<AppProps> = () => {
-  const { search, setSearch } = useFilter();
+  const filter = useFilter();
   const network = useNetwork();
 
   return (
@@ -87,8 +87,8 @@ export const App: React.FC<AppProps> = () => {
                 <Box className="controls__search">
                   <TextField.Root
                     size={"3"}
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
+                    value={filter.search}
+                    onChange={(event) => filter.setSearch(event.target.value)}
                     placeholder="Search resources..."
                   >
                     <TextField.Slot side="left">

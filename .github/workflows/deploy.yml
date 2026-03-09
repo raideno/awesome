@@ -19,7 +19,9 @@ jobs:
       - name: build awesome website
         uses: raideno/awesome@main
         with:
-          yaml-path: ./example.list.yaml
+          yaml-path: list.yaml
+          plugins-directory-path: plugins
+          repository-directory-path: example
 
       - name: upload build artifact
         uses: actions/upload-pages-artifact@v3

@@ -2,12 +2,12 @@ import { useState, type ComponentProps } from "react";
 
 import { Heading, Text } from "@radix-ui/themes";
 import { AutoForm } from "@raideno/auto-form/ui";
-import { AwesomeListElementSchema } from "shared/types/awesome-list";
+import { AwesomeListElementSchema } from "shared/types/list";
 import { toast } from "sonner";
 
 import type React from "react";
 
-import type { AwesomeListElement } from "shared/types/awesome-list";
+import type { AwesomeListElement } from "shared/types/list";
 
 import { Sheet } from "@/components/ui/sheet";
 
@@ -52,7 +52,7 @@ export const ResourceEditSheet: React.FC<ResourceEditSheetProps> = ({
   >["onSubmit"] = async (data, tag, _helpers) => {
     if (tag === "submit")
       try {
-        await list.updateList({
+        await list.update({
           elements: list.content.new.elements.map((el) =>
             el.name === element.name ? { ...el, ...data } : el,
           ),
@@ -73,9 +73,9 @@ export const ResourceEditSheet: React.FC<ResourceEditSheetProps> = ({
   };
 
   return (
-    <Sheet.Root open={isOpen && list.canEdit} onOpenChange={setOpen}>
+    <Sheet.Root open={isOpen} onOpenChange={setOpen}>
       {children && (
-        <Sheet.Trigger disabled={!list.canEdit}>{children}</Sheet.Trigger>
+        <Sheet.Trigger>{children}</Sheet.Trigger>
       )}
       <Sheet.Content portal={false} side="right">
         <AutoForm.Root

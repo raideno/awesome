@@ -6,7 +6,7 @@ import { cn } from 'shared/lib/utils'
 import { ResourceCardDialog } from './card-dialog'
 
 import type { CardProps } from '@radix-ui/themes'
-import type { AwesomeListElement } from 'shared/types/awesome-list'
+import type { AwesomeListElement } from 'shared/types/list'
 
 import { useMarkers } from '@/contexts/markers'
 
@@ -53,6 +53,7 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
               size={'5'}
               weight={'bold'}
               className={cn(
+                'line-clamp-1',
                 'group-hover:text-test-100',
                 isCrossed && 'line-through',
               )}
