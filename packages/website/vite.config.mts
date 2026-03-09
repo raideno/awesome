@@ -83,9 +83,7 @@ const EnvironmentSchema = z
       ? env.REPOSITORY_IGNORE.split(",").map((s) => s.trim()).filter(Boolean)
       : [".git", "node_modules", ".DS_Store"];
 
-    const PLUGINS_DIRECTORY_PATH = env.PLUGINS_DIRECTORY_PATH
-      ? path.resolve(env.REPOSITORY_DIRECTORY_PATH, env.PLUGINS_DIRECTORY_PATH)
-      : path.resolve(env.REPOSITORY_DIRECTORY_PATH, "plugins");
+    const PLUGINS_DIRECTORY_PATH = env.PLUGINS_DIRECTORY_PATH && path.resolve(env.REPOSITORY_DIRECTORY_PATH, env.PLUGINS_DIRECTORY_PATH)
 
     return {
       ...env,
