@@ -4,10 +4,9 @@ branding:
   icon: book-open
   color: orange
 inputs:
-  inputs:
-    ref:
-      description: "Ref to use for the awesome source. Defaults to the action ref."
-      required: true
+  ref:
+    description: "Ref to use for the awesome source. Defaults to the action ref."
+    required: true
   yaml-path:
     description: "Path to the YAML file to use as data source, relative to repository-directory-path (or the workspace root if not set)."
     required: true
@@ -61,16 +60,28 @@ runs:
         fi
       shell: bash
 
-    - name: copy user YAML file
+    - name: stage user repository files
       run: |
         REPO_DIR="${{ steps.repo-dir.outputs.value }}"
-        SRC_YAML="$REPO_DIR/${{ inputs.yaml-path }}"
+        STAGING_DIR="awesome-src/packages/website/user-repository"
+        mkdir -p "$STAGING_DIR"
+        # Copy everything from the user repo except git internals and node_modules
+        rsync -a \
+          --exclude='.git' \
+          --exclude='node_modules' \
+          --exclude='.DS_Store' \
+          "$REPO_DIR/" "$STAGING_DIR/"
+        echo "[awesome]: staged user repository to $STAGING_DIR"
+      shell: bash
+
+    - name: copy user YAML file
+      run: |
+        STAGING_DIR="awesome-src/packages/website/user-repository"
         DEST_YAML="awesome-src/packages/website/${{ inputs.yaml-path }}"
         mkdir -p "$(dirname "$DEST_YAML")"
-        cp "$SRC_YAML" "$DEST_YAML"
-        YAML_DIR="$(dirname "$SRC_YAML")"
-        if [ -f "$YAML_DIR/README.md" ]; then
-          cp "$YAML_DIR/README.md" "awesome-src/packages/website/$(dirname "${{ inputs.yaml-path }}")/README.md"
+        cp "$STAGING_DIR/${{ inputs.yaml-path }}" "$DEST_YAML"
+        if [ -f "$STAGING_DIR/$(dirname "${{ inputs.yaml-path }}")/README.md" ]; then
+          cp "$STAGING_DIR/$(dirname "${{ inputs.yaml-path }}")/README.md" "awesome-src/packages/website/$(dirname "${{ inputs.yaml-path }}")/README.md"
           echo "[awesome]: README.md copied."
         else
           echo "[awesome]: No README.md found, skipping."
@@ -96,8 +107,6 @@ runs:
 
     - name: build internal packages
       run: |
-        # cd awesome-src
-        # npm run build --workspace packages/services/storage
         cd awesome-src/packages/services/storage
         npm run build
       shell: bash
@@ -105,7 +114,7 @@ runs:
     - name: install plugin dependencies
       env:
         PLUGINS_DIRECTORY_PATH: ${{ inputs.plugins-directory-path }}
-        REPOSITORY_DIRECTORY_PATH: ${{ steps.repo-dir.outputs.value }}
+        REPOSITORY_DIRECTORY_PATH: ${{ github.workspace }}/awesome-src/packages/website/user-repository
       run: |
         cd awesome-src/packages/website
         npm run install-plugin-deps
@@ -116,7 +125,7 @@ runs:
         BASE: ${{ steps.base.outputs.value }}
         LIST_FILE_PATH: ${{ inputs.yaml-path }}
         PLUGINS_DIRECTORY_PATH: ${{ inputs.plugins-directory-path }}
-        REPOSITORY_DIRECTORY_PATH: ${{ steps.repo-dir.outputs.value }}
+        REPOSITORY_DIRECTORY_PATH: ${{ github.workspace }}/awesome-src/packages/website/user-repository
         GITHUB_REPOSITORY_URL: https://github.com/${{ github.repository }}
         USER_REPOSITORY_COMMIT_HASH: ${{ steps.user-commit.outputs.hash }}
         AWESOME_WEBSITE_TAG: ${{ steps.awesome-ref.outputs.value }}
@@ -125,8 +134,6 @@ runs:
         npm run build --workspace website
       shell: bash
 
-    # Kept for backward compatibility: early adopters referenced awesome-website-src/dist
-    # directly in their upload-pages-artifact step. New users should use awesome-src/packages/website/dist.
     - name: backward compatibility
       run: |
         mkdir -p awesome-website-src
