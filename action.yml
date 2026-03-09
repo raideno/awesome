@@ -92,8 +92,10 @@ runs:
 
     - name: build internal packages
       run: |
-        cd awesome-src
-        npm run build --workspace packages/services/storage
+        # cd awesome-src
+        # npm run build --workspace packages/services/storage
+        cd awesome-src/packages/services/storage
+        npm run build
       shell: bash
 
     - name: install plugin dependencies
