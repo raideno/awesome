@@ -7,7 +7,7 @@ import * as yaml from "js-yaml";
 import { VitePWA } from "vite-plugin-pwa";
 
 import viteReact from "@vitejs/plugin-react";
-import awesomePluginsPlugin from "./plugins/awesome-plugins";
+import plugins from "./plugins/plugins";
 import repository from "./plugins/repository";
 
 import { AwesomeListSchema } from "../shared/src/types/list";
@@ -122,7 +122,7 @@ const list = loaded.files[Environment.LIST_FILE_PATH] as unknown as AwesomeList;
 export default vite.defineConfig({
   plugins: [
     viteReact(),
-    awesomePluginsPlugin(Environment.PLUGINS_DIRECTORY_PATH),
+    plugins(Environment.PLUGINS_DIRECTORY_PATH),
     repository.plugin(loaded),
     VitePWA({
       registerType: "autoUpdate",

@@ -53,6 +53,7 @@ export const ResourceCard: React.FC<ResourceCardProps> = ({
               size={'5'}
               weight={'bold'}
               className={cn(
+                'line-clamp-1',
                 'group-hover:text-test-100',
                 isCrossed && 'line-through',
               )}

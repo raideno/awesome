@@ -43,7 +43,7 @@ export interface RepositoryContextType {
     session: Record<string, string>;
   };
   changes: Record<string, RepositoryFileDiff>;
-  get: (path: string) => Promise<string>;
+  get: (path: string) => Promise<string | null>;
   /**
    * Writes `content` to `path`.
    *
@@ -62,15 +62,21 @@ export interface RepositoryContextType {
 
 const repository = repository_ as RepositoryVirtualModule;
 
-const fetchFile = async (relativePath: string): Promise<string> => {
+const fetchFile = async (relativePath: string): Promise<string | null> => {
   const url = `${repository.baseUrl}/${relativePath}`;
 
   const response = await fetch(url);
 
   if (!response.ok) {
-    throw new Error(
-      `[repository](fetch): failed to load "${relativePath}" (${response.status} ${response.statusText})`,
-    );
+    return null;
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+  /**
+   * NOTE: for now html is considered to be the page's html, a fallback, so plugins better not use html files for storage as they won't receive it for now.
+   */
+  if (contentType.includes("text/html")) {
+    return null;
   }
 
   return response.text();
@@ -159,10 +165,12 @@ export const RepositoryProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const get = React.useCallback(
-    async (path: string): Promise<string> => {
+    async (path: string): Promise<string | null> => {
       if (path in newFiles) return newFiles[path];
 
       const content = await fetchFile(path);
+
+      if (content === null) return null;
 
       setOldFiles((previous) => ({ ...previous, [path]: content }));
       setNewFiles((previous) => ({ ...previous, [path]: content }));
